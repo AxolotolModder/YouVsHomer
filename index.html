@@ -1,0 +1,2295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AxolotlModder's RANDOM BRAND BRAWL</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.0/umd/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; }
+        canvas { display: block; width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
+        
+        /* -------------------------------------
+           FIGHTING GAME UI OVERHAUL
+        -------------------------------------- */
+        
+        /* Animated Diagonal Speed Stripes for Menus */
+        .menu-screen { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            pointer-events: auto; transition: opacity 0.4s ease-in-out; 
+            background-color: #0a0f1c; overflow: hidden;
+        }
+        .menu-screen::before {
+            content: ""; position: absolute; inset: -50%; z-index: -1;
+            background: repeating-linear-gradient(
+                45deg,
+                rgba(0, 0, 0, 0) 0px, rgba(0, 0, 0, 0) 40px,
+                rgba(255, 255, 255, 0.03) 40px, rgba(255, 255, 255, 0.03) 80px
+            );
+            background-size: 200% 200%;
+            animation: panStripes 30s linear infinite;
+        }
+        .menu-screen::after {
+            content: ""; position: absolute; inset: 0; z-index: -1;
+            background: radial-gradient(circle at center, transparent 20%, rgba(0,0,0,0.8) 100%);
+        }
+        @keyframes panStripes { 0% { transform: translate(0, 0); } 100% { transform: translate(-20%, -20%); } }
+        .hidden { display: none !important; opacity: 0; pointer-events: none; }
+        
+        /* Epic Typography */
+        .title-text-small {
+            font-size: 2.5rem; font-weight: 900; font-style: italic; letter-spacing: 8px;
+            color: #facc15; text-shadow: 2px 2px 0 #b45309, 4px 4px 10px rgba(0,0,0,0.8);
+            margin-bottom: -10px; z-index: 2;
+        }
+        .title-text-mid {
+            font-size: 5rem; font-weight: 900; font-style: italic; letter-spacing: -2px;
+            background: linear-gradient(to bottom, #ffffff 0%, #cbd5e1 50%, #64748b 51%, #334155 100%);
+            -webkit-background-clip: text; color: transparent;
+            filter: drop-shadow(0 5px 15px rgba(0,0,0,0.8)); margin-bottom: -20px; line-height: 1; z-index: 2;
+            -webkit-text-stroke: 2px #000;
+        }
+        .title-text-huge {
+            font-size: 11rem; font-weight: 900; font-style: italic; letter-spacing: -5px;
+            background: linear-gradient(to bottom, #fca5a5 0%, #ef4444 40%, #b91c1c 50%, #7f1d1d 100%);
+            -webkit-background-clip: text; color: transparent;
+            filter: drop-shadow(0 15px 25px rgba(220, 38, 38, 0.6)); margin-bottom: 10px; line-height: 0.9;
+            -webkit-text-stroke: 4px #450a0a; z-index: 2;
+        }
+
+        /* Slanted Arcade Buttons */
+        .btn { 
+            background: linear-gradient(90deg, #dc2626 0%, #991b1b 100%); 
+            color: white; padding: 15px 60px; font-size: 2.5rem; font-weight: 900; font-style: italic;
+            cursor: pointer; text-transform: uppercase; 
+            clip-path: polygon(20px 0, 100% 0, calc(100% - 20px) 100%, 0 100%);
+            border-left: 6px solid #f87171; border-right: 6px solid #f87171;
+            box-shadow: 0 15px 25px rgba(0,0,0,0.8);
+            transition: all 0.15s ease-out; pointer-events: auto; text-shadow: 2px 2px 0px black;
+        }
+        .btn:hover { 
+            transform: scale(1.1) skewX(-2deg); 
+            filter: drop-shadow(0 0 15px rgba(239, 68, 68, 0.8)) brightness(1.2); 
+            border-color: #fff; 
+        }
+        .btn:active { transform: scale(0.95); }
+
+        .panel-container {
+            background: rgba(15, 23, 42, 0.85); border: 2px solid #334155;
+            border-radius: 8px; padding: 40px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9);
+            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 30px), calc(100% - 30px) 100%, 0 100%);
+        }
+
+        /* Character Grid & Cards */
+        .melee-char-card { 
+            border-radius: 4px; transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1); 
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.8), 0 5px 10px rgba(0,0,0,0.5);
+        }
+        .melee-char-card:hover { transform: scale(1.15); z-index: 40; box-shadow: 0 15px 30px rgba(0,0,0,0.9); border-color: white !important; }
+
+        /* Slanted Player Panels */
+        .player-select-panel {
+            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%);
+            transition: all 0.2s;
+        }
+        .slanted-name-box {
+            clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+        }
+
+        /* Top Bar Styling */
+        .top-bar-slanted {
+            background: linear-gradient(90deg, rgba(0,0,0,0.9) 0%, rgba(30,41,59,0.9) 100%);
+            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 15px), calc(100% - 40px) 100%, 0 100%);
+            border-bottom: 4px solid #475569;
+        }
+
+        /* HUD Styling */
+        #hud { position: absolute; bottom: 30px; left: 0; width: 100%; display: flex; justify-content: space-between; padding: 0 8%; box-sizing: border-box; }
+        .player-hud { 
+            background: linear-gradient(180deg, rgba(15,23,42,0.85) 0%, rgba(0,0,0,0.95) 100%); 
+            border: 3px solid #334155; padding: 15px 30px; min-width: 240px; text-align: center; 
+            box-shadow: 0 15px 30px rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+            clip-path: polygon(15px 0, 100% 0, calc(100% - 15px) 100%, 0 100%);
+        }
+        .player-hud.p1 { border-bottom: 8px solid #3b82f6; }
+        .player-hud.p2 { border-bottom: 8px solid #ef4444; }
+        .percent { font-size: 4rem; font-weight: 900; line-height: 1; text-shadow: 4px 4px 0 #000; font-style: italic; }
+        .stocks { display: flex; justify-content: center; gap: 8px; margin-top: 10px; }
+        .stock-icon { width: 22px; height: 22px; border-radius: 50%; border: 3px solid #000; box-shadow: 0 0 8px rgba(255,255,255,0.4); }
+        .stock-icon.p1-stock { background: #3b82f6; }
+        .stock-icon.p2-stock { background: #ef4444; }
+        .stock-icon.p3-stock { background: #eab308; }
+        .stock-icon.p4-stock { background: #22c55e; }
+
+        .pct-low { color: #ffffff; }
+        .pct-med { color: #facc15; }
+        .pct-high { color: #ef4444; }
+        .pct-dead { color: #ff0000; transform: scale(1.1) rotate(-3deg); text-shadow: 0 0 20px red, 4px 4px 0 black; }
+        
+        /* Menu Gamepad Hover Glowing FX */
+        .p1-hover-fx { border-color: #fca5a5 !important; box-shadow: 0 0 25px rgba(248, 113, 113, 0.9) !important; transform: scale(1.15) !important; z-index: 40; }
+        .p2-hover-fx { border-color: #93c5fd !important; box-shadow: 0 0 25px rgba(96, 165, 250, 0.9) !important; transform: scale(1.15) !important; z-index: 40; }
+        .p3-hover-fx { border-color: #fde047 !important; box-shadow: 0 0 25px rgba(253, 224, 71, 0.9) !important; transform: scale(1.15) !important; z-index: 40; }
+        .p4-hover-fx { border-color: #86efac !important; box-shadow: 0 0 25px rgba(134, 239, 172, 0.9) !important; transform: scale(1.15) !important; z-index: 40; }
+        .stage-hover-fx { border-color: #fbbf24 !important; box-shadow: 0 15px 35px rgba(251, 191, 36, 0.7) !important; transform: scale(1.08) !important; }
+
+        .stage-grid { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin: 20px 0; max-width: 900px; }
+        .stage-card { 
+            width: 240px; height: 150px; border: 4px solid #334155; cursor: pointer; 
+            display: flex; align-items: flex-end; justify-content: center; padding-bottom: 15px; font-weight: 800; font-size: 1.3rem;
+            background: linear-gradient(180deg, rgba(30,41,59,0.5) 0%, rgba(15,23,42,0.95) 100%); 
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); pointer-events: auto; text-shadow: 3px 3px 5px rgba(0,0,0,1); text-align: center; line-height: 1.2;
+            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%);
+        }
+        .stage-card:hover { border-color: #fff; transform: scale(1.08); box-shadow: 0 15px 35px rgba(255,255,255,0.3); }
+
+        /* Animation for Ready Banner */
+        @keyframes pulseGlow { 0% { transform: translate(-50%, -50%) scale(1); filter: brightness(1); } 50% { transform: translate(-50%, -50%) scale(1.05); filter: brightness(1.2); } 100% { transform: translate(-50%, -50%) scale(1); filter: brightness(1); } }
+        .ready-animate { animation: pulseGlow 1s ease-in-out infinite; left: 50%; transform: translate(-50%, -50%); width: 120%; }
+    </style>
+</head>
+<body>
+
+    <!-- 3D Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- UI Overlay -->
+    <div id="ui-layer">
+        
+        <!-- Title Screen -->
+        <div id="title-screen" class="menu-screen">
+            <h1 class="title-text-small">AXOLOTLMODDER'S</h1>
+            <h1 class="title-text-mid">RANDOM BRAND</h1>
+            <h1 class="title-text-huge">BRAWL</h1>
+            
+            <div class="mt-8 relative group">
+                <button class="btn group-hover:shadow-[0_0_40px_rgba(239,68,68,0.8)]" onclick="goToScreen('character-select')">Press Start</button>
+            </div>
+            <p class="text-sm mt-12 text-gray-500 font-bold tracking-widest uppercase bg-black bg-opacity-50 px-6 py-2 rounded-full border border-gray-800">Version 1.0.0 • 3D Fighting Engine</p>
+        </div>
+
+        <!-- Character Select (Melee Style) -->
+        <div id="character-select" class="menu-screen hidden">
+            <!-- Top Bar -->
+            <div class="absolute top-0 left-0 w-full top-bar-slanted flex justify-between items-center px-10 py-3 z-20">
+                <div class="flex items-center gap-4">
+                    <h1 class="text-4xl font-black italic tracking-widest text-white drop-shadow-lg">SMASH</h1>
+                    <span class="text-sm bg-red-600 text-white font-black rounded-sm px-3 py-1 border border-red-400 slanted-name-box">VS</span>
+                </div>
+                <div class="border border-gray-500 bg-gray-900 bg-opacity-80 px-12 py-2 slanted-name-box shadow-inner hidden md:block">
+                    <h2 class="text-lg font-bold tracking-widest text-gray-300">SELECT YOUR FIGHTER</h2>
+                </div>
+                <button class="bg-gray-700 text-white font-black uppercase text-lg px-8 py-2 border border-gray-500 hover:bg-gray-600 hover:text-yellow-400 active:bg-gray-800 transition-colors slanted-name-box" onclick="goToScreen('title-screen')">
+                    &lt; BACK
+                </button>
+            </div>
+
+            <!-- Main CSS Layout -->
+            <div class="flex flex-col items-center mt-20 z-10 w-full max-w-5xl px-4">
+                
+                <!-- Character Grid -->
+                <div class="flex flex-wrap justify-center gap-2 p-4 bg-gray-900 bg-opacity-80 border-2 border-gray-700 mb-8 shadow-2xl" id="roster" style="clip-path: polygon(15px 0, 100% 0, calc(100% - 15px) 100%, 0 100%);">
+                    <!-- Populated by JS -->
+                </div>
+
+                <!-- Player Panels Container -->
+                <div class="flex gap-4 justify-center w-full mt-4">
+                    <!-- P1 Panel -->
+                    <div class="relative w-64 h-80 border-t-8 border-l-4 border-red-600 bg-gradient-to-b from-gray-800 to-black flex flex-col justify-end overflow-hidden cursor-pointer hover:border-white player-select-panel shadow-[0_10px_30px_rgba(220,38,38,0.2)]" id="panel-p1" onclick="cycleSkin(1)">
+                        <div id="p1-type-btn" class="absolute top-0 right-0 bg-blue-600 text-white font-black text-sm px-6 py-1 z-40 cursor-pointer transition-colors hover:bg-blue-500 slanted-name-box rounded-bl-lg" onclick="togglePlayerType(event, 0)">HMN</div>
+                        <div class="absolute top-0 left-2 bg-gray-900 text-gray-300 font-bold text-xs px-2 py-1 border-b border-r border-gray-600 z-10 hidden rounded-br-lg shadow-md" id="skin-hint-p1">SKINS (CLICK)</div>
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-300 z-0" id="portrait-p1"></div>
+                        
+                        <!-- Name Tag -->
+                        <div class="relative z-20 w-full flex justify-center -mb-2 mt-auto">
+                            <span id="skin-name-p1" class="text-[11px] font-black uppercase bg-purple-700 text-white px-4 py-1 border-t-2 border-purple-400 hidden shadow-lg slanted-name-box">Classic</span>
+                        </div>
+                        <div class="relative z-20 bg-red-900 bg-opacity-90 py-2 mb-6 shadow-2xl hidden border-y border-red-500" id="name-box-p1">
+                            <h3 class="text-center font-black text-3xl italic tracking-tighter text-white drop-shadow-md" id="name-p1"></h3>
+                        </div>
+                        <div class="absolute bottom-[-15px] left-0 w-full text-center text-[7rem] font-black italic text-red-500 opacity-20 z-10 pointer-events-none mix-blend-screen" style="line-height: 0.8;">P1</div>
+                    </div>
+                    
+                    <!-- P2 Panel -->
+                    <div class="relative w-64 h-80 border-t-8 border-l-4 border-blue-600 bg-gradient-to-b from-gray-800 to-black flex flex-col justify-end overflow-hidden cursor-pointer hover:border-white player-select-panel shadow-[0_10px_30px_rgba(37,99,235,0.2)]" id="panel-p2" onclick="cycleSkin(2)">
+                        <div id="p2-type-btn" class="absolute top-0 right-0 bg-blue-600 text-white font-black text-sm px-6 py-1 z-40 cursor-pointer transition-colors hover:bg-blue-500 slanted-name-box rounded-bl-lg" onclick="togglePlayerType(event, 1)">HMN</div>
+                        <div class="absolute top-0 left-2 bg-gray-900 text-gray-300 font-bold text-xs px-2 py-1 border-b border-r border-gray-600 z-10 hidden rounded-br-lg shadow-md" id="skin-hint-p2">SKINS (CLICK)</div>
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-300 z-0" id="portrait-p2"></div>
+                        
+                        <div class="relative z-20 w-full flex justify-center -mb-2 mt-auto">
+                            <span id="skin-name-p2" class="text-[11px] font-black uppercase bg-purple-700 text-white px-4 py-1 border-t-2 border-purple-400 hidden shadow-lg slanted-name-box">Classic</span>
+                        </div>
+                        <div class="relative z-20 bg-blue-900 bg-opacity-90 py-2 mb-6 shadow-2xl hidden border-y border-blue-500" id="name-box-p2">
+                            <h3 class="text-center font-black text-3xl italic tracking-tighter text-white drop-shadow-md" id="name-p2"></h3>
+                        </div>
+                        <div class="absolute bottom-[-15px] left-0 w-full text-center text-[7rem] font-black italic text-blue-500 opacity-20 z-10 pointer-events-none mix-blend-screen" style="line-height: 0.8;">P2</div>
+                    </div>
+
+                    <!-- P3 Panel -->
+                    <div class="relative w-64 h-80 border-t-8 border-l-4 border-yellow-500 bg-gradient-to-b from-gray-900 to-black flex flex-col justify-end overflow-hidden opacity-40 grayscale cursor-pointer hover:border-white transition-all player-select-panel" id="panel-p3" onclick="cycleSkin(3)">
+                        <div id="p3-type-btn" class="absolute top-0 right-0 bg-gray-600 text-gray-300 font-black text-sm px-6 py-1 z-40 cursor-pointer transition-colors slanted-name-box rounded-bl-lg border border-gray-500" onclick="togglePlayerType(event, 2)">N/A</div>
+                        <div class="absolute top-0 left-2 bg-gray-900 text-gray-300 font-bold text-xs px-2 py-1 border-b border-r border-gray-600 z-10 hidden rounded-br-lg shadow-md" id="skin-hint-p3">SKINS (CLICK)</div>
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-300 z-0" id="portrait-p3"></div>
+                        
+                        <div class="relative z-20 w-full flex justify-center -mb-2 mt-auto">
+                            <span id="skin-name-p3" class="text-[11px] font-black uppercase bg-purple-700 text-white px-4 py-1 border-t-2 border-purple-400 hidden shadow-lg slanted-name-box">Classic</span>
+                        </div>
+                        <div class="relative z-20 bg-yellow-900 bg-opacity-90 py-2 mb-6 shadow-2xl hidden border-y border-yellow-500" id="name-box-p3">
+                            <h3 class="text-center font-black text-3xl italic tracking-tighter text-white drop-shadow-md" id="name-p3"></h3>
+                        </div>
+                        <div class="absolute bottom-[-15px] left-0 w-full text-center text-[7rem] font-black italic text-yellow-600 opacity-20 z-10 pointer-events-none mix-blend-screen" style="line-height: 0.8;">P3</div>
+                    </div>
+
+                    <!-- P4 Panel -->
+                    <div class="relative w-64 h-80 border-t-8 border-l-4 border-green-500 bg-gradient-to-b from-gray-900 to-black flex flex-col justify-end overflow-hidden opacity-40 grayscale cursor-pointer hover:border-white transition-all player-select-panel" id="panel-p4" onclick="cycleSkin(4)">
+                        <div id="p4-type-btn" class="absolute top-0 right-0 bg-gray-600 text-gray-300 font-black text-sm px-6 py-1 z-40 cursor-pointer transition-colors slanted-name-box rounded-bl-lg border border-gray-500" onclick="togglePlayerType(event, 3)">N/A</div>
+                        <div class="absolute top-0 left-2 bg-gray-900 text-gray-300 font-bold text-xs px-2 py-1 border-b border-r border-gray-600 z-10 hidden rounded-br-lg shadow-md" id="skin-hint-p4">SKINS (CLICK)</div>
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-300 z-0" id="portrait-p4"></div>
+                        
+                        <div class="relative z-20 w-full flex justify-center -mb-2 mt-auto">
+                            <span id="skin-name-p4" class="text-[11px] font-black uppercase bg-purple-700 text-white px-4 py-1 border-t-2 border-purple-400 hidden shadow-lg slanted-name-box">Classic</span>
+                        </div>
+                        <div class="relative z-20 bg-green-900 bg-opacity-90 py-2 mb-6 shadow-2xl hidden border-y border-green-500" id="name-box-p4">
+                            <h3 class="text-center font-black text-3xl italic tracking-tighter text-white drop-shadow-md" id="name-p4"></h3>
+                        </div>
+                        <div class="absolute bottom-[-15px] left-0 w-full text-center text-[7rem] font-black italic text-green-600 opacity-20 z-10 pointer-events-none mix-blend-screen" style="line-height: 0.8;">P4</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Animated Ready to Fight Banner -->
+            <div id="ready-banner" class="absolute top-[45%] bg-gradient-to-r from-transparent via-red-600 to-transparent border-t-4 border-b-4 border-yellow-400 text-center py-8 z-50 hidden cursor-pointer ready-animate" onclick="goToScreen('stage-select')">
+                <h2 class="text-[6rem] leading-none font-black italic text-yellow-400 tracking-widest" style="text-shadow: 6px 6px 0 #000, 0 0 30px rgba(250,204,21,0.8);">READY TO FIGHT!</h2>
+                <p class="text-white font-bold text-2xl mt-2 drop-shadow-xl tracking-widest uppercase bg-black bg-opacity-50 inline-block px-8 py-1 rounded-full">Click anywhere to select stage</p>
+            </div>
+        </div>
+
+        <!-- Stage Select -->
+        <div id="stage-select" class="menu-screen hidden">
+            <div class="panel-container flex flex-col items-center">
+                <h2 class="text-5xl font-black mb-8 text-white drop-shadow-md italic uppercase tracking-widest border-b-4 border-yellow-400 pb-2">Select Stage</h2>
+                <div class="stage-grid" id="stages">
+                    <!-- Populated by JS -->
+                </div>
+                <button class="btn mt-10" style="background: linear-gradient(90deg, #475569, #334155); border-color: #94a3b8; font-size: 1.5rem; padding: 15px 40px;" onclick="goToScreen('character-select')">Back to Roster</button>
+            </div>
+        </div>
+
+        <!-- In-Game HUD -->
+        <div id="hud" class="hidden absolute bottom-[30px] left-0 w-full flex justify-center gap-6 px-4 box-border pointer-events-none">
+            <!-- (HUD Elements injected by JS remain visually the same but utilize the new CSS shapes) -->
+            <div class="player-hud p1 hidden" id="hud-panel-0">
+                <div class="text-2xl font-black text-blue-400 uppercase tracking-widest drop-shadow-md" id="hud-name-p1">P1</div>
+                <div class="percent pct-low" id="hud-pct-p1">0%</div>
+                <div class="stocks" id="hud-stocks-p1"></div>
+            </div>
+            <div class="player-hud p2 hidden" id="hud-panel-1">
+                <div class="text-2xl font-black text-red-400 uppercase tracking-widest drop-shadow-md" id="hud-name-p2">P2</div>
+                <div class="percent pct-low" id="hud-pct-p2">0%</div>
+                <div class="stocks" id="hud-stocks-p2"></div>
+            </div>
+            <div class="player-hud p3 hidden" id="hud-panel-2" style="border-bottom: 8px solid #eab308;">
+                <div class="text-2xl font-black text-yellow-400 uppercase tracking-widest drop-shadow-md" id="hud-name-p3">P3</div>
+                <div class="percent pct-low" id="hud-pct-p3">0%</div>
+                <div class="stocks" id="hud-stocks-p3"></div>
+            </div>
+            <div class="player-hud p4 hidden" id="hud-panel-3" style="border-bottom: 8px solid #22c55e;">
+                <div class="text-2xl font-black text-green-400 uppercase tracking-widest drop-shadow-md" id="hud-name-p4">P4</div>
+                <div class="percent pct-low" id="hud-pct-p4">0%</div>
+                <div class="stocks" id="hud-stocks-p4"></div>
+            </div>
+            <div class="absolute top-[-80px] left-1/2 transform -translate-x-1/2 text-center pointer-events-none z-50">
+                <h3 class="text-[6rem] font-black text-yellow-400 italic drop-shadow-2xl" id="match-timer" style="text-shadow: 4px 4px 0px black, 0 0 40px rgba(250,204,21,0.5); -webkit-text-stroke: 3px #000;">GO!</h3>
+            </div>
+        </div>
+
+        <!-- Result Screen -->
+        <div id="result-screen" class="menu-screen hidden">
+            <h1 class="text-[10rem] font-black mb-0 text-yellow-400 italic drop-shadow-2xl" id="winner-text" style="text-shadow: 0 0 50px rgba(250, 204, 21, 0.6), 8px 8px 0 black; line-height: 1;">GAME!</h1>
+            <div class="px-12 py-6 bg-black bg-opacity-80 border-4 border-t-0 mb-8 shadow-[0_20px_50px_rgba(0,0,0,0.9)] slanted-name-box" id="winner-box">
+                <h2 class="text-5xl font-black uppercase tracking-widest text-white" id="winner-subtext" style="text-shadow: 2px 2px 4px #000;">Player 1 Wins</h2>
+            </div>
+            <button class="btn mt-4" onclick="resetGame()">Play Again</button>
+        </div>
+
+    </div>
+
+    <script>
+        // ==========================================
+        // GAME CONFIGURATION & DATA
+        // ==========================================
+        const CHARACTERS = {
+            'peashooter': { 
+                name: 'Peashooter', color: 0x32CD32, skins: [0x32CD32, 0x00BFFF, 0xFF4500, 0x4B0082], speed: 0.18, jump: 0.35, weight: 1.0, 
+                skinNames: ['Classic', 'Snow Pea', 'Fire Pea', 'Shadow Pea'],
+                icon: 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/peashooterimageG.png',
+                portraits: [
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/peashooterimageG.png',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/peashooterimageB.png',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/peashooterimageR.png',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/peashooterimageP.png'
+                ],
+                modelUrl: 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/plants_vs._zombies_3_pre-_alpha_-_peashooter.glb',
+                modelScale: 3.8, 
+                skinUrls: [
+                    null, 
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/2026_06_11_0qq_Kleki.png', 
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/2026_06_11_0qr_Kleki.png', 
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/2026_06_11_0qk_Kleki.png'  
+                ],
+                moves: { 
+                    neutral: { type: 'melee', dmg: 5, kb: 1.2, w: 2, h: 2, d: 2, ox: 1.5, oy: 0, duration: 10, startup: 3 },
+                    forward_neutral: { type: 'melee', dmg: 9, kb: 1.6, w: 3, h: 2, d: 2, ox: 2, oy: 0, duration: 15, startup: 6 },
+                    up_neutral: { type: 'melee', dmg: 7, kb: 1.5, w: 2, h: 4, d: 2, ox: 0.5, oy: 2, duration: 12, startup: 4 },
+                    down_neutral: { type: 'melee', dmg: 6, kb: 1.3, w: 3, h: 1, d: 2, ox: 1.5, oy: -1.5, duration: 12, startup: 5 },
+                    special: { type: 'projectile', dmg: 8, kb: 1.5, vx: 0.4, vy: 0, w: 0.8, color: 0x90EE90, life: 60, duration: 15, startup: 5 },
+                    up_special: { type: 'recovery_dash', dmg: 5, kb: 1.2, vx: 0.1, vy: 0.5, w: 2.5, h: 2.5, duration: 25, startup: 2 },
+                    down_special: { type: 'projectile', dmg: 15, kb: 2.5, vx: 0.1, vy: 0, w: 1.5, color: 0x8B4513, life: 100, duration: 20, startup: 10 } 
+                }
+            },
+            'denji': { name: 'Denji', color: 0xFF8C00, skins: [0xFF8C00, 0xDC143C, 0x00CED1, 0x808080], speed: 0.22, jump: 0.38, weight: 1.1,
+                skinNames: ['Public Safety', 'Blood Fiend', 'Devil Hunter', 'Manga Accurate'],
+                icon: 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/csmskinO.png',
+                portraits: [
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/csmskinO.png',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/csmskinR.png',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/csmskinB.png',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/csmskinG.png'
+                ],
+                modelUrls: {
+                    'idle': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/csm%20idle.fbx',
+                    'run': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/csm%20run.fbx',
+                    'jump': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/cms%20jum.fbx',
+                    'attack': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/csm%20attack.fbx',
+                    'fall': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/cms%20jum.fbx',
+                    'special': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/csm%20attack.fbx'
+                },
+                modelScale: 0.0008, 
+                customModelScales: {
+                    'idle': 0.0008,
+                    'run': 0.0008,
+                    'jump': 0.0008,
+                    'attack': 0.0008,
+                    'fall': 0.0008,
+                    'special': 0.0008
+                },
+                modelRotationOffsets: {
+                    'attack': 0, 
+                    'special': 0
+                },
+                skinUrls: [
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/cms%20texture.png', // Default Orange
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/ChatGPT%20Image%20Jun%2013,%202026,%2012_55_43%20PM.png', // Red
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/2026_06_13_0lr_Kleki.png', // Blue
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/2026_06_13_0ls_Kleki.png'  // Grey
+                ],
+                moves: { 
+                    neutral: { type: 'melee', dmg: 10, kb: 1.5, w: 3, h: 3, d: 2, ox: 2, oy: 0, duration: 12, startup: 4 },
+                    forward_neutral: { type: 'melee', dmg: 14, kb: 2.0, w: 4, h: 3, d: 2, ox: 2.5, oy: 0, duration: 18, startup: 7 },
+                    up_neutral: { type: 'melee', dmg: 11, kb: 1.8, w: 3, h: 4, d: 2, ox: 1, oy: 2, duration: 15, startup: 5 },
+                    down_neutral: { type: 'melee', dmg: 12, kb: 1.7, w: 4, h: 2, d: 2, ox: 2, oy: -1, duration: 14, startup: 6 },
+                    special: { type: 'dash', dmg: 15, kb: 2.2, speed: 0.6, duration: 12, startup: 0, w: 4, h: 4, ox: 0, oy: 0 },
+                    up_special: { type: 'recovery_dash', dmg: 8, kb: 1.5, vx: 0.2, vy: 0.6, duration: 20, w: 3, h: 4, ox: 0, oy: 1 },
+                    down_special: { type: 'melee', dmg: 18, kb: 2.5, w: 6, h: 3, d: 4, ox: 0, oy: 0, duration: 20, startup: 8 } 
+                }
+            },
+            'jotaro': { name: 'Jotaro', color: 0x4B0082, skins: [0x4B0082, 0x000000, 0xFFFFFF, 0x228B22], speed: 0.16, jump: 0.32, weight: 1.2,
+                skinNames: ['Stardust Crusader', 'Part 3 Anime', 'Part 4 White', 'Part 6 Green'],
+                icon: 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/JotaroskinP.png',
+                portraits: [
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/JotaroskinP.png',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/JotaroskinB.png',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/JotaroskinW.png',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/JotaroskinG.png'
+                ],
+                modelUrls: {
+                    'idle': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/jotaro%20idle.fbx',
+                    'run': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/jotaro%20walk.fbx',
+                    'jump': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/jotaro%20jump.fbx',
+                    'attack': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/jotaro%20point.fbx',
+                    'fall': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/jotaro%20jump.fbx',
+                    'special': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/jotaro%20point.fbx'
+                },
+                modelScale: 0.00025, // Scaled down to match Invincible!
+                customModelScales: {
+                    'idle': 0.00025,
+                    'run': 0.00025,
+                    'jump': 0.00025,
+                    'attack': 0.00025,
+                    'fall': 0.00025,
+                    'special': 0.00025
+                },
+                modelRotationOffsets: {
+                    'attack': 0,
+                    'special': 0
+                },
+                skinUrls: [
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/jotarotex.png',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/ChatGPT%20Image%20Jun%2013,%202026,%2005_18_53%20PM.png',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/ChatGPT%20Image%20Jun%2013,%202026,%2005_24_33%20PM.png',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/ChatGPT%20Image%20Jun%2013,%202026,%2005_28_38%20PM.png'
+                ],
+                // NEW: Stand configuration
+                standData: {
+                    modelUrl: 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/star%20platinum.fbx',
+                    textureUrl: 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/sp.png',
+                    scale: 0.00625, // Scaled proportionally so he still matches Jotaro perfectly
+                    offsetX: 2.0, // This places him exactly where the hitbox spawns!
+                    offsetY: -1.75, // Keeps him planted on the floor relative to Jotaro
+                    rotationOffset: 0
+                },
+                moves: { 
+                    neutral: { type: 'melee', dmg: 4, kb: 0.5, w: 3, h: 2.5, d: 2, ox: 1.8, oy: 0, duration: 25, startup: 2 },
+                    forward_neutral: { type: 'melee', dmg: 16, kb: 2.3, w: 4, h: 3, d: 2, ox: 2.5, oy: 0, duration: 20, startup: 8 },
+                    up_neutral: { type: 'melee', dmg: 13, kb: 2.0, w: 3, h: 5, d: 2, ox: 1.5, oy: 2.5, duration: 15, startup: 6 },
+                    down_neutral: { type: 'melee', dmg: 9, kb: 1.6, w: 4, h: 1.5, d: 2, ox: 2, oy: -1.5, duration: 12, startup: 5 },
+                    special: { type: 'melee', dmg: 18, kb: 2.5, w: 6, h: 1.5, d: 2, ox: 4, oy: 0, duration: 15, startup: 10 }, 
+                    up_special: { type: 'recovery_dash', dmg: 10, kb: 1.8, vx: 0.3, vy: 0.5, w: 4, h: 4, ox: 0, oy: 0, duration: 18, startup: 4 },
+                    down_special: { type: 'melee', dmg: 25, kb: 3.0, w: 8, h: 4, d: 4, ox: 0, oy: 0, duration: 30, startup: 20 } 
+                }
+            },
+            'knight': { name: 'Knight', color: 0xFF0000, skins: [0xFF0000, 0x0000FF, 0x32CD32, 0xFF8C00], speed: 0.20, jump: 0.35, weight: 1.0,
+                skinNames: ['Red Knight (Lightning)', 'Blue Knight (Ice)', 'Green Knight (Poison)', 'Orange Knight (Fire)'],
+                icon: 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/castleR.png',
+                portraits: [
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/castleR.png',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/castleB.png',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/castleG.png',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/castleO.png'
+                ],
+                // NEW ENGINE FEATURE: Swapping entire GLB models based on the selected skin!
+                skinModels: [
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/cc_compressed.glb',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/bluknight_compressed.glb',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/greenknight_compressed.glb',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/orangeknight_compressed.glb'
+                ],
+                modelScale: 0.6, // Shrunk from 1.5!
+                skinMaterials: [], // This empty array stops the engine from tinting his built-in colors!
+                moves: { 
+                    neutral: { type: 'projectile', dmg: 6, kb: 1.2, vx: 0.5, vy: 0, w: 0.8, color: 0xFFFFFF, life: 30, duration: 12, startup: 4 },
+                    forward_neutral: { type: 'melee', dmg: 10, kb: 1.6, w: 4, h: 3, d: 2, ox: 2, oy: 0, duration: 15, startup: 6 },
+                    up_neutral: { type: 'melee', dmg: 8, kb: 1.5, w: 3, h: 4, d: 2, ox: 1, oy: 2, duration: 14, startup: 5 },
+                    down_neutral: { type: 'melee', dmg: 12, kb: 1.8, w: 4, h: 2, d: 2, ox: 0, oy: -1.5, duration: 16, startup: 7 },
+                    special: { type: 'projectile', dmg: 12, kb: 2.0, vx: 0.6, vy: 0, w: 1.2, color: 0xFFFFFF, life: 50, duration: 20, startup: 8 }, 
+                    up_special: { type: 'recovery_dash', dmg: 6, kb: 1.2, vx: 0.1, vy: 0.5, w: 3, h: 3, ox: 0, oy: 0, duration: 20, startup: 2 },
+                    down_special: { type: 'projectile', dmg: 14, kb: 2.2, vx: 0, vy: -0.4, w: 1.5, color: 0xFFFFFF, life: 60, duration: 20, startup: 8 } 
+                }
+            },
+            'invincible': { name: 'Invincible', color: 0xFFD700, skins: [0xFFD700, 0x1E90FF, 0xDC143C, 0x000000], speed: 0.25, jump: 0.45, weight: 0.9,
+                skinNames: ['Classic Yellow', 'Blue Suit', 'Bloody Brawler', 'Viltrumite Empire'],
+                icon: 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/invskinY.png',
+                portraits: [
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/invskinY.png',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/invskinB.png',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/invskinR.png',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/invskinBl.png'
+                ],
+                modelUrls: {
+                    'idle': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/invinci%20idle.fbx',
+                    'run': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/invinciwalk.fbx',
+                    'jump': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/invinciboo.fbx',
+                    'attack': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/invincible%20attack.fbx',
+                    'fall': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/invinciboo.fbx',
+                    'special': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/invincifly.fbx' 
+                },
+                modelScale: 0.03,
+                modelRotationOffsets: {
+                    'attack': 0,
+                    'special': 0
+                },
+                skinUrls: [
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/inv.png', // Default
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/ChatGPT%20Image%20Jun%2012,%202026,%2008_07_48%20PM.png', // Blue
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/ChatGPT%20Image%20Jun%2012,%202026,%2008_10_18%20PM.png', // Red
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/ChatGPT%20Image%20Jun%2012,%202026,%2008_13_39%20PM.png'  // Black
+                ],
+                moves: { 
+                    neutral: { type: 'melee', dmg: 8, kb: 1.4, w: 2.5, h: 2, d: 2, ox: 1.5, oy: 0, duration: 10, startup: 4 },
+                    forward_neutral: { type: 'melee', dmg: 12, kb: 1.9, w: 3, h: 2.5, d: 2, ox: 2, oy: 0, duration: 14, startup: 6 },
+                    up_neutral: { type: 'melee', dmg: 10, kb: 1.7, w: 2.5, h: 3.5, d: 2, ox: 1, oy: 2, duration: 12, startup: 5 },
+                    down_neutral: { type: 'melee', dmg: 14, kb: 2.0, w: 4, h: 2, d: 2, ox: 1.5, oy: -1.5, duration: 16, startup: 7 },
+                    special: { type: 'dash', dmg: 12, kb: 1.8, speed: 0.5, duration: 15, w: 3, h: 3, ox: 0, oy: 0 },
+                    up_special: { type: 'recovery_dash', dmg: 10, kb: 1.5, vx: 0.3, vy: 0.5, duration: 25, startup: 2, w: 3, h: 3, ox: 0, oy: 0 },
+                    down_special: { type: 'melee', dmg: 16, kb: 2.2, w: 6, h: 2, d: 4, ox: 0, oy: -1.5, duration: 20, startup: 8 }
+                }
+            },
+            'cuphead': { name: 'Cuphead', color: 0xFF0000, skins: [0xFF0000, 0x0000FF, 0x32CD32, 0xFFFF00], speed: 0.20, jump: 0.36, weight: 0.85,
+                skinNames: ['Red Cup', 'Mugman Blue', 'Elder Green', 'Legendary Chalice'],
+                icon: 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/CUPHEADIMAGER.png',
+                portraits: [
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/CUPHEADIMAGER.png',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/CUPHEADIMAGEB.png',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/CUPHEADIMAGEG.png',
+                    'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/CUPHEADIMAGEY.png'
+                ],
+                // Multiple FBX models array to handle Mixamo exports
+                modelUrls: {
+                    'idle': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/cuphead%20idle.fbx',
+                    'run': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/cuphead%20run.fbx',
+                    'jump': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/cuphead%20jump.fbx',
+                    'attack': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/cuphead%20shoot.fbx',
+                    'fall': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/cuphead%20fall.fbx',
+                    'special': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/cuphead%20shoot.fbx' 
+                },
+                modelScale: 0.00025, 
+                // Explicitly forcing every single animation to the correct small scale
+                customModelScales: {
+                    'idle': 0.00025,
+                    'run': 0.00025,
+                    'jump': 0.00025,
+                    'attack': 0.00025,
+                    'fall': 0.00025,
+                    'special': 0.00025
+                },
+                modelRotationOffsets: {
+                    'attack': -Math.PI / 2,
+                    'special': -Math.PI / 2
+                },
+                
+                // Specific materials to recolor when switching skins
+                skinMaterials: ['PANTALON_rojoo', 'naeiz_roja'], 
+                
+                // Static image textures to map specifically to faces/body parts
+                staticTextures: {
+                    'MATERIAL_BLANCO_BRILLANTE.003': 'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/poo.png'
+                },
+                // Textures that change depending on which skin is selected!
+                multiSkinTextures: {
+                    'Material.007': [
+                        'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/Image_2.png', // 0: Red
+                        'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/bu.png', // 1: Blue
+                        'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/2026_06_12_0v4_Kleki.png', // 2: Green
+                        'https://raw.githubusercontent.com/AxolotolModder/YouVsHomer/main/2026_06_12_0v4_Kleki1.png' // 3: Yellow
+                    ]
+                },
+                moves: { 
+                    neutral: { type: 'projectile', dmg: 4, kb: 0.5, vx: 0.5, vy: 0, w: 0.5, color: 0x87CEEB, life: 40, duration: 12, startup: 4 },
+                    forward_neutral: { type: 'projectile', dmg: 6, kb: 1.0, vx: 0.6, vy: 0, w: 0.8, color: 0xFF4500, life: 30, duration: 15, startup: 5 },
+                    up_neutral: { type: 'projectile', dmg: 5, kb: 1.2, vx: 0.2, vy: 0.6, w: 0.6, color: 0x87CEEB, life: 40, duration: 14, startup: 4 },
+                    down_neutral: { type: 'melee', dmg: 8, kb: 1.5, w: 3, h: 2, d: 2, ox: 1.5, oy: -1, duration: 12, startup: 4 },
+                    special: { type: 'projectile', dmg: 12, kb: 2.0, vx: 0.8, vy: 0, w: 1.2, color: 0xFFD700, life: 50, duration: 20, startup: 10 }, 
+                    up_special: { type: 'recovery_dash', dmg: 8, kb: 1.2, vx: 0.2, vy: 0.45, w: 3, h: 3, ox: 0, oy: 0, duration: 18, startup: 2 },
+                    down_special: { type: 'projectile', dmg: 15, kb: 2.5, vx: 0, vy: -0.5, w: 1.5, color: 0x444444, life: 80, duration: 15, startup: 8 } 
+                }
+            },
+            'random': { name: 'Random', color: 0x444444, skins: [0x444444], isRandom: true }
+        };
+
+        // ==========================================
+        // PROCEDURAL STAGE GENERATOR
+        // ==========================================
+        function generateStages() {
+            const stages = {
+                'arena': {
+                    name: 'Indie Arena', desc: '(Super Indie Smash)', bgColor: 0x0f0f1a, bounds: { x: 45, y: 40, bottom: -20 },
+                    platforms: [
+                        { shape: 'box', x: 0, y: -2, z: 0, w: 36, h: 2, d: 12, color: 0x444466, type: 'main' },
+                        { shape: 'box', x: -10, y: 5, z: 0, w: 10, h: 1, d: 6, color: 0x666688, type: 'pass-through' },
+                        { shape: 'box', x: 10, y: 5, z: 0, w: 10, h: 1, d: 6, color: 0x666688, type: 'pass-through' },
+                        { shape: 'box', x: 0, y: 12, z: 0, w: 10, h: 1, d: 6, color: 0x666688, type: 'pass-through' }
+                    ],
+                    decorations: [
+                        // Big floating monitor/screen in BG
+                        { shape: 'box', x: 0, y: 15, z: -25, w: 30, h: 16, d: 2, color: 0x111111 },
+                        { shape: 'box', x: 0, y: 15, z: -24, w: 28, h: 14, d: 0.5, color: 0x00ccff, emissive: 0x00aaff, emissiveIntensity: 0.5 },
+                        // Support beams
+                        { shape: 'cylinder', x: -15, y: 5, z: -25, radius: 1, h: 40, color: 0x222222 },
+                        { shape: 'cylinder', x: 15, y: 5, z: -25, radius: 1, h: 40, color: 0x222222 }
+                    ]
+                },
+                'castle': {
+                    name: 'Barbarian Keep', desc: '(Castle Crashers)', bgColor: 0x8ab3d4, bounds: { x: 45, y: 40, bottom: -20 },
+                    platforms: [
+                        { shape: 'box', x: 0, y: -2, z: 0, w: 42, h: 6, d: 14, color: 0x8b8989, type: 'main' }, // Stone wall
+                        { shape: 'box', x: -14, y: 6, z: 0, w: 8, h: 1, d: 6, color: 0x6b4226, type: 'pass-through' }, // Wood platform
+                        { shape: 'box', x: 14, y: 6, z: 0, w: 8, h: 1, d: 6, color: 0x6b4226, type: 'pass-through' } // Wood platform
+                    ],
+                    decorations: [
+                        // Castle wall base extension
+                        { shape: 'box', x: 0, y: -10, z: 0, w: 42, h: 10, d: 14, color: 0x7a7878 },
+                        // Distant Castle Towers
+                        { shape: 'cylinder', x: -25, y: 10, z: -20, radius: 6, h: 40, color: 0x707070 },
+                        { shape: 'cone', x: -25, y: 35, z: -20, radius: 8, h: 15, segments: 8, color: 0x8b0000 },
+                        { shape: 'cylinder', x: 25, y: 10, z: -20, radius: 6, h: 40, color: 0x707070 },
+                        { shape: 'cone', x: 25, y: 35, z: -20, radius: 8, h: 15, segments: 8, color: 0x8b0000 },
+                        // Grass in foreground below
+                        { shape: 'box', x: 0, y: -6, z: 12, w: 60, h: 4, d: 10, color: 0x228b22 }
+                    ]
+                },
+                'pvz': {
+                    name: 'Front Yard', desc: '(Plants vs. Zombies)', bgColor: 0x5cb8ff, bounds: { x: 40, y: 40, bottom: -20 },
+                    platforms: [ { shape: 'box', x: 0, y: -2, z: 0, w: 38, h: 4, d: 16, color: 0x32CD32, type: 'main' } ],
+                    decorations: [
+                        { shape: 'box', x: 0, y: -4, z: 0, w: 38, h: 4, d: 14, color: 0x5c3a21 }, // Dirt
+                        // House Base
+                        { shape: 'box', x: 0, y: 5, z: -18, w: 28, h: 14, d: 12, color: 0xe6d5ac }, 
+                        // House Roof
+                        { shape: 'cone', x: 0, y: 16, z: -18, radius: 22, h: 10, segments: 4, ry: Math.PI/4, color: 0x8b2a2a },
+                        // Door
+                        { shape: 'box', x: 0, y: 2, z: -11.9, w: 4, h: 8, d: 0.5, color: 0x4a2e15 },
+                    ]
+                },
+                'csm': {
+                    name: 'Devil Ruins', desc: '(Chainsaw Man)', bgColor: 0x110505, bounds: { x: 45, y: 40, bottom: -20 },
+                    platforms: [
+                        { shape: 'box', x: 0, y: -2, z: 0, w: 40, h: 4, d: 14, color: 0x2d2d3a, type: 'main' },
+                        { shape: 'box', x: -12, y: 5, z: 0, w: 8, h: 1, d: 6, color: 0x444455, type: 'pass-through' },
+                        { shape: 'box', x: 12, y: 5, z: 0, w: 8, h: 1, d: 6, color: 0x444455, type: 'pass-through' },
+                        { shape: 'box', x: 0, y: 12, z: 0, w: 10, h: 1, d: 6, color: 0x444455, type: 'pass-through' }
+                    ],
+                    decorations: [
+                        // Giant skyscrapers in background
+                        { shape: 'box', x: -20, y: 10, z: -25, w: 16, h: 50, d: 16, color: 0x1a1a24 },
+                        { shape: 'box', x: 10, y: 15, z: -30, w: 20, h: 60, d: 20, color: 0x15151e },
+                        { shape: 'box', x: 30, y: 5, z: -20, w: 15, h: 40, d: 15, color: 0x1a1a24 },
+                        // Neon trims / Blood rivers
+                        { shape: 'box', x: 0, y: 0.1, z: 2, w: 40.2, h: 0.2, d: 2, color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 0.4 },
+                    ]
+                },
+                'jjba': {
+                    name: 'Cairo Night', desc: "(JoJo's Bizarre Adv.)", bgColor: 0x05051a, bounds: { x: 45, y: 40, bottom: -20 },
+                    platforms: [
+                        { shape: 'box', x: 0, y: -2, z: 0, w: 40, h: 4, d: 15, color: 0x8b7355, type: 'main' },
+                        { shape: 'box', x: -16, y: 6, z: 0, w: 8, h: 1, d: 6, color: 0x660066, type: 'pass-through' },
+                        { shape: 'box', x: 16, y: 6, z: 0, w: 8, h: 1, d: 6, color: 0x660066, type: 'pass-through' }
+                    ],
+                    decorations: [
+                        // DIO's Mansion Base
+                        { shape: 'box', x: 0, y: 8, z: -20, w: 40, h: 20, d: 8, color: 0xaa8c66 },
+                        // Road Roller (Frozen in air)
+                        { shape: 'box', x: -15, y: 22, z: -10, w: 8, h: 5, d: 6, color: 0xffcc00, animated: 'float-slow-offset' },
+                        { shape: 'cylinder', x: -15, y: 20, z: -10, radius: 3, h: 7, rz: Math.PI/2, color: 0x888888, animated: 'float-slow-offset' },
+                        // Giant Moon
+                        { shape: 'sphere', x: 20, y: 35, z: -40, radius: 10, color: 0xffffff, emissive: 0xffddaa, emissiveIntensity: 0.5 }
+                    ]
+                },
+                'invincible': {
+                    name: 'Earth Orbit', desc: '(Invincible)', bgColor: 0x000000, bounds: { x: 45, y: 45, bottom: -20 },
+                    platforms: [
+                        { shape: 'box', x: -12, y: -2, z: 0, w: 16, h: 2, d: 12, color: 0x8899aa, type: 'main' },
+                        { shape: 'box', x: 12, y: -2, z: 0, w: 16, h: 2, d: 12, color: 0x8899aa, type: 'main' },
+                        { shape: 'box', x: 0, y: 6, z: 0, w: 12, h: 1, d: 10, color: 0x3366ff, type: 'pass-through' } 
+                    ],
+                    decorations: [
+                        // Earth
+                        { shape: 'sphere', x: 0, y: -65, z: -40, radius: 50, color: 0x0055ff, emissive: 0x0022aa, emissiveIntensity: 0.4 },
+                        // Orbital Ring
+                        { shape: 'torus', x: 0, y: -20, z: -40, radius: 70, tube: 2, rx: Math.PI/2.2, color: 0x556677 },
+                    ]
+                },
+                'cuphead': {
+                    name: 'Devil\'s Casino', desc: '(Cuphead)', bgColor: 0x220505, bounds: { x: 40, y: 45, bottom: -20 },
+                    platforms: [
+                        // Giant Roulette Wheel Base
+                        { shape: 'cylinder', x: 0, y: -4, z: 0, radius: 22, h: 4, color: 0x333333, type: 'main' },
+                        { shape: 'box', x: -10, y: 6, z: 0, w: 6, h: 1, d: 6, color: 0xffffff, type: 'pass-through' },
+                        { shape: 'box', x: 10, y: 6, z: 0, w: 6, h: 1, d: 6, color: 0xffffff, type: 'pass-through' },
+                    ],
+                    decorations: [
+                        // Giant Dice
+                        { shape: 'box', x: -18, y: 5, z: -15, w: 10, h: 10, d: 10, rx: 0.5, ry: 0.8, color: 0xffffff, animated: 'spin-float' },
+                        { shape: 'box', x: 18, y: 15, z: -20, w: 8, h: 8, d: 8, rx: 1.2, ry: 0.3, color: 0xffffff, animated: 'spin-float-offset' }
+                    ]
+                }
+            };
+
+            // PROCEDURALLY ADD MASSIVE DETAIL (Hundreds of objects injected cleanly)
+
+            // Arena Details (Neon floating cubes)
+            for(let i=0; i<20; i++) {
+                stages['arena'].decorations.push({ shape: 'box', x: (Math.random()-0.5)*60, y: Math.random()*30, z: -15 - Math.random()*20, w: 1, h: 1, d: 1, rx: Math.random(), ry: Math.random(), color: 0x00ffff, emissive: 0x0088ff, emissiveIntensity: 0.8, animated: 'spin-float' });
+            }
+
+            // Castle Details (Battlements and background trees)
+            for(let i = -20; i <= 20; i += 4) {
+                stages['castle'].decorations.push({ shape: 'box', x: i, y: 2, z: -6, w: 2, h: 2, d: 2, color: 0x8b8989 }); // Crenellations along back wall
+            }
+            for(let i = -30; i <= 30; i += 8) {
+                if(Math.abs(i) < 22) continue; // Don't block middle too much
+                stages['castle'].decorations.push({ shape: 'cylinder', x: i, y: 2, z: -15, radius: 1, h: 10, color: 0x5c4033 }); // Trunk
+                stages['castle'].decorations.push({ shape: 'cone', x: i, y: 12, z: -15, radius: 4, h: 15, segments: 6, color: 0x2e8b57 }); // Leaves
+            }
+
+            // PvZ Details (Fence, Windows, Sunflowers)
+            for(let i = -18; i <= 18; i += 2) {
+                stages['pvz'].decorations.push({ shape: 'box', x: i, y: 1.5, z: -11, w: 0.5, h: 3, d: 0.2, color: 0xffffff }); // Picket Fence
+            }
+            stages['pvz'].decorations.push({ shape: 'box', x: 0, y: 1, z: -11, w: 38, h: 0.3, d: 0.4, color: 0xffffff }); // Fence rail
+            // House Windows
+            stages['pvz'].decorations.push({ shape: 'box', x: -8, y: 7, z: -11.9, w: 4, h: 4, d: 0.2, color: 0xffff88, emissive: 0xffff88, emissiveIntensity: 0.6 });
+            stages['pvz'].decorations.push({ shape: 'box', x: 8, y: 7, z: -11.9, w: 4, h: 4, d: 0.2, color: 0xffff88, emissive: 0xffff88, emissiveIntensity: 0.6 });
+            // Tree
+            stages['pvz'].decorations.push({ shape: 'cylinder', x: -16, y: 4, z: -8, radius: 1, h: 12, color: 0x4a2e15 }); // Trunk
+            stages['pvz'].decorations.push({ shape: 'sphere', x: -16, y: 12, z: -8, radius: 5, color: 0x228b22 }); // Leaves
+
+            // CSM Details (Hundreds of glowing windows on skyscrapers, rubble)
+            for(let y = 0; y < 40; y += 4) {
+                for(let x = -25; x < -15; x += 3) {
+                    if(Math.random() > 0.4) stages['csm'].decorations.push({ shape: 'box', x: x, y: y, z: -16.9, w: 1, h: 1.5, d: 0.2, color: 0xffaa00, emissive: 0xffaa00, emissiveIntensity: 0.8 });
+                }
+                for(let x = 3; x < 17; x += 3) {
+                    if(Math.random() > 0.5) stages['csm'].decorations.push({ shape: 'box', x: x, y: y+5, z: -19.9, w: 1.2, h: 1.2, d: 0.2, color: 0xff5500, emissive: 0xff5500, emissiveIntensity: 0.7 });
+                }
+            }
+            // Debris
+            for(let i=0; i<15; i++) {
+                stages['csm'].decorations.push({ shape: 'box', x: (Math.random()-0.5)*40, y: -2 + Math.random()*2, z: (Math.random()-0.5)*12, w: Math.random()*3+1, h: Math.random()*2+0.5, d: Math.random()*3+1, rx: Math.random(), ry: Math.random(), color: 0x333344 });
+            }
+
+            // JJBA Details (Mansion pillars, Street lamps)
+            for(let i = -18; i <= 18; i += 6) {
+                stages['jjba'].decorations.push({ shape: 'cylinder', x: i, y: 8, z: -15, radius: 1.5, h: 20, color: 0xc2a47c }); // Pillars
+            }
+            stages['jjba'].decorations.push({ shape: 'box', x: 0, y: 18, z: -15, w: 42, h: 2, d: 4, color: 0x8b7355 }); // Balcony
+            // Street lamps
+            stages['jjba'].decorations.push({ shape: 'cylinder', x: -18, y: 3, z: -5, radius: 0.2, h: 10, color: 0x333 });
+            stages['jjba'].decorations.push({ shape: 'sphere', x: -18, y: 8, z: -5, radius: 0.8, color: 0xffddaa, emissive: 0xffddaa, emissiveIntensity: 1 });
+
+            // Invincible Details (Earth Continents, Satellites)
+            for(let i=0; i<8; i++) { // Continents
+                stages['invincible'].decorations.push({ shape: 'sphere', x: (Math.random()-0.5)*40, y: -65 + (Math.random()*20), z: -20 + (Math.random()*-20), radius: 15 + Math.random()*10, color: 0x008822 });
+            }
+            // Satellites
+            stages['invincible'].decorations.push({ shape: 'box', x: -25, y: 15, z: -20, w: 2, h: 2, d: 2, color: 0xffffff, animated: 'float-slow' });
+            stages['invincible'].decorations.push({ shape: 'box', x: -25, y: 15, z: -20, w: 10, h: 0.2, d: 4, color: 0x2244ff, animated: 'float-slow' }); // Solar panel
+            stages['invincible'].decorations.push({ shape: 'box', x: 25, y: -5, z: -15, w: 3, h: 3, d: 3, color: 0xaa2222, animated: 'float-slow-offset' }); // Viltrumite ship core
+
+            // Cuphead Details (Roulette wedges, Poker Chips)
+            for(let i=0; i<16; i++) {
+                let angle = (i / 16) * Math.PI * 2;
+                let cColor = i % 2 === 0 ? 0xaa0000 : 0x111111;
+                stages['cuphead'].decorations.push({ shape: 'box', x: Math.cos(angle)*15, y: -1.9, z: Math.sin(angle)*15, w: 6, h: 0.2, d: 8, ry: -angle, color: cColor });
+            }
+            // Stacks of Chips
+            for(let i=0; i<5; i++) {
+                stages['cuphead'].decorations.push({ shape: 'cylinder', x: 22, y: -5 + (i*1.5), z: -10, radius: 4, h: 1, color: 0x0055aa });
+                stages['cuphead'].decorations.push({ shape: 'cylinder', x: -25, y: -2 + (i*1.5), z: -5, radius: 4, h: 1, color: 0xaa0000 });
+            }
+
+            return stages;
+        }
+
+        const STAGES = generateStages();
+
+        // ==========================================
+        // GLOBAL VARIABLES
+        // ==========================================
+        let scene, camera, renderer;
+        let gameState = 'menu'; // menu, select, playing, result
+        let currentStageId = null;
+        
+        let players = [];
+        let stageMeshes = [];
+        let decorationMeshes = [];
+        let projectiles = [];
+        let hitboxes = [];
+        let bgStars;
+
+        let globalTime = 0; 
+
+        // Menu & 4-Player States
+        let activeScreen = 'title-screen';
+        let pSelections = [null, null, null, null];
+        let pSkins = [0, 0, 0, 0];
+        let pTypes = [0, 0, -1, -1]; // 0 = HMN, 1-9 = CPU, -1 = N/A
+        let cursors = [0, 0, 0, 0];
+        let menuDelay = [0, 0, 0, 0];
+        let stageCursor = 0; // Fixes the missing variable error!
+
+        // Input state
+        const keys = {
+            p1: { left: false, right: false, up: false, down: false, attack: false, special: false },
+            p2: { left: false, right: false, up: false, down: false, attack: false, special: false },
+            p3: { left: false, right: false, up: false, down: false, attack: false, special: false },
+            p4: { left: false, right: false, up: false, down: false, attack: false, special: false }
+        };
+
+        const padKeys = {
+            p1: { left: false, right: false, up: false, down: false },
+            p2: { left: false, right: false, up: false, down: false },
+            p3: { left: false, right: false, up: false, down: false },
+            p4: { left: false, right: false, up: false, down: false }
+        };
+        
+        const prevPadState = { 
+            0: { jump: false, attack: false, special: false }, 
+            1: { jump: false, attack: false, special: false },
+            2: { jump: false, attack: false, special: false },
+            3: { jump: false, attack: false, special: false }
+        };
+
+        // ==========================================
+        // UI MANAGEMENT
+        // ==========================================
+
+        function togglePlayerType(e, pIndex) {
+            e.stopPropagation();
+            
+            // Cycle: N/A (-1) -> HMN (0) -> LV 1 -> LV 3 -> LV 5 -> LV 7 -> LV 9 -> N/A (-1)
+            if (pTypes[pIndex] === -1) pTypes[pIndex] = 0;
+            else if (pTypes[pIndex] === 0) pTypes[pIndex] = 1;
+            else if (pTypes[pIndex] === 1) pTypes[pIndex] = 3;
+            else if (pTypes[pIndex] === 3) pTypes[pIndex] = 5;
+            else if (pTypes[pIndex] === 5) pTypes[pIndex] = 7;
+            else if (pTypes[pIndex] === 7) pTypes[pIndex] = 9;
+            else pTypes[pIndex] = -1;
+
+            if (pIndex === 0 && pTypes[pIndex] === -1) pTypes[pIndex] = 0; // P1 always plays
+
+            const panel = document.getElementById(`panel-p${pIndex+1}`);
+            const btn = document.getElementById(`p${pIndex+1}-type-btn`);
+            
+            if (pTypes[pIndex] === -1) {
+                btn.innerText = 'N/A';
+                btn.className = 'absolute top-0 left-2 bg-gray-500 text-black font-black text-sm px-4 py-0.5 border-b-2 border-r-2 border-gray-300 z-40 cursor-pointer';
+                panel.classList.add('opacity-50', 'grayscale');
+                // clear selection
+                pSelections[pIndex] = null;
+                document.getElementById(`name-box-p${pIndex+1}`).classList.add('hidden');
+                document.getElementById(`portrait-p${pIndex+1}`).style.opacity = '0';
+                document.getElementById(`skin-hint-p${pIndex+1}`).classList.add('hidden');
+                document.querySelectorAll(`.p${pIndex+1}-cursor`).forEach(c => c.classList.add('hidden'));
+            } else {
+                panel.classList.remove('opacity-50', 'grayscale');
+                document.getElementById(`name-box-p${pIndex+1}`).classList.remove('hidden');
+                if (pTypes[pIndex] > 0) {
+                    btn.innerText = 'LV ' + pTypes[pIndex];
+                    let colorClass = 'bg-gray-500 hover:bg-gray-400 border-gray-400';
+                    if (pTypes[pIndex] === 3) colorClass = 'bg-green-600 hover:bg-green-500 border-green-400';
+                    if (pTypes[pIndex] === 5) colorClass = 'bg-yellow-500 hover:bg-yellow-400 border-yellow-300 text-black';
+                    if (pTypes[pIndex] === 7) colorClass = 'bg-orange-600 hover:bg-orange-500 border-orange-400';
+                    if (pTypes[pIndex] === 9) colorClass = 'bg-red-700 hover:bg-red-600 border-red-400 text-white shadow-[0_0_15px_rgba(220,38,38,0.8)]';
+                    btn.className = `absolute top-0 left-2 font-black text-sm px-2 py-0.5 border-b-2 border-r-2 z-40 cursor-pointer transition-all ${colorClass}`;
+                    if (pTypes[pIndex] !== 5) btn.classList.add('text-white');
+                } else {
+                    btn.innerText = 'HMN';
+                    btn.className = 'absolute top-0 left-2 bg-blue-600 text-white font-black text-sm px-4 py-0.5 border-b-2 border-r-2 border-blue-400 z-40 cursor-pointer transition-colors hover:bg-blue-500';
+                }
+            }
+            checkReadyState();
+        }
+
+        function checkReadyState() {
+            let allReady = true;
+            let activePlayers = 0;
+            for(let i=0; i<4; i++) {
+                if(pTypes[i] !== -1) {
+                    activePlayers++;
+                    if(!pSelections[i]) allReady = false;
+                }
+            }
+            if(allReady && activePlayers >= 2) {
+                document.getElementById('ready-banner').classList.remove('hidden');
+            } else {
+                document.getElementById('ready-banner').classList.add('hidden');
+            }
+        }
+
+        function initUI() {
+            const roster = document.getElementById('roster');
+            for (const [id, char] of Object.entries(CHARACTERS)) {
+                const div = document.createElement('div');
+                div.className = 'relative w-[85px] h-[85px] bg-gray-700 border-[3px] border-gray-400 cursor-pointer hover:border-white overflow-hidden melee-char-card group shadow-lg';
+                div.dataset.char = id;
+                
+                const bgStyle = char.icon 
+                    ? `background-image: url('${char.icon}'); background-size: cover; background-position: top center;` 
+                    : `background-color: #${char.color.toString(16).padStart(6,'0')};`;
+
+                let innerHtmlContent = `
+                    <div class="absolute inset-0 flex items-center justify-center transition-opacity" style="${bgStyle}">
+                        <div class="w-full h-full bg-gradient-to-t from-black to-transparent opacity-60"></div>
+                    </div>
+                    <div class="absolute bottom-0 left-0 w-full bg-black bg-opacity-90 text-center border-t border-gray-500 pb-[1px] pt-[1px] z-20">
+                        <span class="text-[10px] font-bold text-white uppercase tracking-tighter" style="font-family: Arial, sans-serif;">${char.name}</span>
+                    </div>
+                    <div class="absolute top-0 left-0 w-full h-full border-[4px] border-transparent pointer-events-none p1-cursor hidden z-30"></div>
+                    <div class="absolute top-0 left-0 w-full h-full border-[4px] border-transparent pointer-events-none p2-cursor hidden z-30"></div>
+                    <div class="absolute top-0 left-0 w-full h-full border-[4px] border-transparent pointer-events-none p3-cursor hidden z-30"></div>
+                    <div class="absolute top-0 left-0 w-full h-full border-[4px] border-transparent pointer-events-none p4-cursor hidden z-30"></div>
+                `;
+                
+                if (char.isRandom) {
+                    innerHtmlContent += `<div class="absolute inset-0 flex items-center justify-center text-5xl font-black text-gray-300 z-10 drop-shadow-md">?</div>`;
+                }
+                div.innerHTML = innerHtmlContent;
+                
+                // Sync internal cursors with mouse hovers
+                div.onmouseenter = () => {
+                    const idx = Object.keys(CHARACTERS).indexOf(id);
+                    let selectingP = -1;
+                    for(let i=0; i<4; i++) { if (pTypes[i] !== -1 && !pSelections[i]) { selectingP = i; break; } }
+                    if (selectingP !== -1) cursors[selectingP] = idx;
+                };
+                
+                div.onclick = () => handleCharSelect(id, div);
+                roster.appendChild(div);
+            }
+
+            const stageContainer = document.getElementById('stages');
+            for (const [id, stage] of Object.entries(STAGES)) {
+                const div = document.createElement('div');
+                div.className = 'stage-card';
+                div.innerHTML = `${stage.name}<br><span style="font-size:0.9rem; color:#94a3b8;">${stage.desc}</span>`;
+                
+                div.onmouseenter = () => { stageCursor = Object.keys(STAGES).indexOf(id); };
+                div.onclick = () => selectStage(id);
+                stageContainer.appendChild(div);
+            }
+        }
+
+        function goToScreen(screenId) {
+            document.querySelectorAll('.menu-screen').forEach(el => el.classList.add('hidden'));
+            const targetScreen = document.getElementById(screenId);
+            if (targetScreen) targetScreen.classList.remove('hidden');
+            
+            activeScreen = screenId;
+            
+            if(screenId === 'title-screen' || screenId === 'character-select') {
+                gameState = 'menu';
+                scene.background = new THREE.Color(0x0a0a15);
+                scene.fog = new THREE.FogExp2(0x0a0a15, 0.01);
+            }
+
+            if(screenId === 'title-screen') {
+                for(let i=0; i<4; i++) {
+                    pSelections[i] = null; pSkins[i] = 0;
+                    document.getElementById(`name-p${i+1}`).innerText = '';
+                    document.getElementById(`portrait-p${i+1}`).style.backgroundColor = 'transparent';
+                    document.getElementById(`portrait-p${i+1}`).style.backgroundImage = 'none';
+                    document.getElementById(`portrait-p${i+1}`).style.opacity = '0';
+                    document.getElementById(`skin-hint-p${i+1}`).classList.add('hidden');
+                    document.getElementById(`skin-name-p${i+1}`).classList.add('hidden');
+                    document.getElementById(`name-box-p${i+1}`).classList.add('hidden');
+                }
+                
+                document.querySelectorAll('.melee-char-card').forEach(c => { 
+                    c.querySelector('.p1-cursor').classList.replace('border-red-500', 'border-transparent');
+                    c.querySelector('.p1-cursor').classList.add('hidden');
+                    c.querySelector('.p2-cursor').classList.replace('border-blue-500', 'border-transparent');
+                    c.querySelector('.p2-cursor').classList.add('hidden');
+                    c.querySelector('.p3-cursor').classList.replace('border-yellow-500', 'border-transparent');
+                    c.querySelector('.p3-cursor').classList.add('hidden');
+                    c.querySelector('.p4-cursor').classList.replace('border-green-500', 'border-transparent');
+                    c.querySelector('.p4-cursor').classList.add('hidden');
+                });
+
+                document.getElementById('ready-banner').classList.add('hidden');
+            }
+        }
+
+        function handleCharSelect(charId, element) {
+            let actualCharId = charId;
+            if (CHARACTERS[charId].isRandom) {
+                const pool = Object.keys(CHARACTERS).filter(k => !CHARACTERS[k].isRandom);
+                actualCharId = pool[Math.floor(Math.random() * pool.length)];
+            }
+            const char = CHARACTERS[actualCharId];
+
+            let selectingP = -1;
+            for(let i=0; i<4; i++) {
+                if (pTypes[i] !== -1 && !pSelections[i]) { selectingP = i; break; }
+            }
+            if (selectingP === -1) return; // Everyone is ready
+
+            pSelections[selectingP] = actualCharId;
+            pSkins[selectingP] = 0;
+            
+            // Auto-assign alt skin if someone else has it
+            while(true) {
+                let collision = false;
+                for(let j=0; j<selectingP; j++) {
+                    if(pSelections[j] === actualCharId && pSkins[j] === pSkins[selectingP]) collision = true;
+                }
+                if(collision) {
+                    pSkins[selectingP] = (pSkins[selectingP] + 1) % char.skins.length;
+                } else break;
+            }
+
+            const pCursor = element.querySelector(`.p${selectingP+1}-cursor`);
+            const colors = ['border-red-500', 'border-blue-500', 'border-yellow-500', 'border-green-500'];
+            pCursor.classList.replace('border-transparent', colors[selectingP]);
+            pCursor.classList.remove('hidden');
+            
+            document.getElementById(`name-box-p${selectingP+1}`).classList.remove('hidden');
+            document.getElementById(`name-p${selectingP+1}`).innerText = char.name;
+            
+            const skinNameEl = document.getElementById(`skin-name-p${selectingP+1}`);
+            if (char.skinNames) {
+                skinNameEl.innerText = char.skinNames[pSkins[selectingP]];
+                skinNameEl.classList.remove('hidden');
+            }
+            
+            const port = document.getElementById(`portrait-p${selectingP+1}`);
+            if (char.portraits && char.portraits[pSkins[selectingP]]) {
+                port.style.backgroundImage = `url('${char.portraits[pSkins[selectingP]]}')`;
+                port.style.backgroundSize = 'contain';
+                port.style.backgroundRepeat = 'no-repeat';
+                port.style.backgroundPosition = 'bottom center';
+                port.style.backgroundColor = '#' + char.skins[pSkins[selectingP]].toString(16).padStart(6,'0');
+                port.style.opacity = '1';
+            } else {
+                port.style.backgroundImage = 'none';
+                port.style.backgroundColor = '#' + char.skins[pSkins[selectingP]].toString(16).padStart(6,'0');
+                port.style.opacity = '0.7';
+            }
+            document.getElementById(`skin-hint-p${selectingP+1}`).classList.remove('hidden');
+
+            checkReadyState();
+        }
+
+        function cycleSkin(playerNum) {
+            const pIndex = playerNum - 1;
+            if (pSelections[pIndex]) {
+                const charId = pSelections[pIndex];
+                const char = CHARACTERS[charId];
+                
+                pSkins[pIndex] = (pSkins[pIndex] + 1) % char.skins.length;
+                
+                // Skip skin if another active player has it
+                let duplicate = true;
+                let attempts = 0;
+                while(duplicate && attempts < char.skins.length) {
+                    duplicate = false;
+                    for(let i=0; i<4; i++) {
+                        if (i !== pIndex && pSelections[i] === charId && pSkins[i] === pSkins[pIndex]) {
+                            duplicate = true;
+                        }
+                    }
+                    if(duplicate) {
+                        pSkins[pIndex] = (pSkins[pIndex] + 1) % char.skins.length;
+                    }
+                    attempts++;
+                }
+                
+                const skinNameEl = document.getElementById(`skin-name-p${playerNum}`);
+                if (char.skinNames) {
+                    skinNameEl.innerText = char.skinNames[pSkins[pIndex]];
+                    skinNameEl.classList.remove('hidden');
+                }
+                
+                const port = document.getElementById(`portrait-p${playerNum}`);
+                if (char.portraits && char.portraits[pSkins[pIndex]]) {
+                    port.style.backgroundImage = `url('${char.portraits[pSkins[pIndex]]}')`;
+                    port.style.backgroundColor = '#' + char.skins[pSkins[pIndex]].toString(16).padStart(6,'0');
+                } else {
+                    port.style.backgroundImage = 'none';
+                    port.style.backgroundColor = '#' + char.skins[pSkins[pIndex]].toString(16).padStart(6,'0');
+                }
+            }
+        }
+
+        function selectStage(stageId) {
+            currentStageId = stageId;
+            document.querySelectorAll('.menu-screen').forEach(el => el.classList.add('hidden')); 
+            startGame();
+        }
+
+        function updateHUD() {
+            if (gameState !== 'playing') return;
+            
+            players.forEach(player => {
+                if (player.stocks <= 0) {
+                    document.getElementById(`hud-panel-${player.pIndex}`).classList.add('opacity-30', 'grayscale');
+                }
+                const pctEl = document.getElementById(`hud-pct-p${player.pIndex + 1}`);
+                pctEl.innerText = Math.floor(player.percent) + '%';
+                
+                pctEl.className = 'percent';
+                if (player.percent < 50) pctEl.classList.add('pct-low');
+                else if (player.percent < 100) pctEl.classList.add('pct-med');
+                else if (player.percent < 150) pctEl.classList.add('pct-high');
+                else pctEl.classList.add('pct-dead');
+
+                const stocksEl = document.getElementById(`hud-stocks-p${player.pIndex + 1}`);
+                stocksEl.innerHTML = '';
+                for(let i=0; i<player.stocks; i++) {
+                    const stock = document.createElement('div');
+                    stock.className = `stock-icon p${player.pIndex + 1}-stock`;
+                    stocksEl.appendChild(stock);
+                }
+            });
+        }
+
+        function checkWinCondition() {
+            let alive = players.filter(p => p.stocks > 0);
+            if (alive.length <= 1) {
+                if (alive.length === 1) endGame(alive[0].pIndex);
+                else endGame(-1);
+            }
+        }
+
+        function endGame(winnerIndex) {
+            gameState = 'result';
+            document.getElementById('hud').classList.add('hidden');
+            goToScreen('result-screen');
+            const winnerText = document.getElementById('winner-text');
+            const winnerSub = document.getElementById('winner-subtext');
+            const winnerBox = document.getElementById('winner-box');
+            
+            if (winnerIndex === -1) {
+                winnerText.innerText = "DRAW!";
+                winnerText.style.color = "white";
+                winnerSub.innerText = "Nobody wins.";
+                winnerBox.style.borderColor = "gray";
+            } else {
+                winnerText.innerText = "GAME!";
+                const colors = ["#ef4444", "#3b82f6", "#eab308", "#22c55e"];
+                winnerText.style.color = colors[winnerIndex];
+                const charName = CHARACTERS[pSelections[winnerIndex]].name;
+                winnerSub.innerText = `Player ${winnerIndex + 1} (${charName}) Wins!`;
+                winnerSub.style.color = colors[winnerIndex];
+                winnerBox.style.borderColor = colors[winnerIndex];
+            }
+        }
+
+        function resetGame() {
+            players.forEach(p => { 
+                scene.remove(p.mesh); 
+                if(p.standMesh) scene.remove(p.standMesh); // Also clean up attached stands!
+            });
+            stageMeshes.forEach(m => scene.remove(m));
+            decorationMeshes.forEach(m => scene.remove(m));
+            projectiles.forEach(p => scene.remove(p.mesh));
+            hitboxes.forEach(h => scene.remove(h.mesh));
+            
+            players = [];
+            stageMeshes = [];
+            decorationMeshes = [];
+            projectiles = [];
+            hitboxes = [];
+            
+            goToScreen('title-screen');
+        }
+
+        // ==========================================
+        // THREE.JS & GAME ENGINE SETUP
+        // ==========================================
+        function initThree() {
+            const canvas = document.getElementById('gameCanvas');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0a15);
+            scene.fog = new THREE.FogExp2(0x0a0a15, 0.01);
+
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 10, 50);
+
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(20, 40, 20);
+            dirLight.castShadow = true;
+            dirLight.shadow.camera.left = -40;
+            dirLight.shadow.camera.right = 40;
+            dirLight.shadow.camera.top = 40;
+            dirLight.shadow.camera.bottom = -40;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
+            scene.add(dirLight);
+
+            createBackground();
+            window.addEventListener('resize', onWindowResize);
+            setupInputs();
+        }
+
+        function createBackground() {
+            const geo = new THREE.BufferGeometry();
+            const vertices = [];
+            for (let i = 0; i < 800; i++) {
+                vertices.push((Math.random() - 0.5) * 400, (Math.random() - 0.5) * 400, (Math.random() - 0.5) * 200 - 100);
+            }
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+            const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.6, transparent: true, opacity: 0.6 });
+            bgStars = new THREE.Points(geo, mat);
+            scene.add(bgStars);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // ==========================================
+        // INPUT HANDLING
+        // ==========================================
+        
+        function getAttackType(base, keys) {
+            if (keys.up) return 'up_' + base;
+            if (keys.down) return 'down_' + base;
+            if (keys.left || keys.right) return 'forward_' + base;
+            return base;
+        }
+
+        function setupInputs() {
+            window.addEventListener('keydown', (e) => {
+                // Keyboard Menu Controls
+                if (gameState === 'menu' || gameState === 'result') {
+                    if (e.code === 'KeyA') moveMenuCursor(0, 'left');
+                    if (e.code === 'KeyD') moveMenuCursor(0, 'right');
+                    if (e.code === 'KeyF') selectMenuAction(0);
+                    if (e.code === 'KeyG') cycleSkin(1);
+                    
+                    if (e.code === 'ArrowLeft') moveMenuCursor(1, 'left');
+                    if (e.code === 'ArrowRight') moveMenuCursor(1, 'right');
+                    if (e.code === 'KeyK') selectMenuAction(1);
+                    if (e.code === 'KeyL') cycleSkin(2);
+                    return; 
+                }
+
+                if(gameState !== 'playing') return;
+                
+                const p1 = players.find(p => p.pIndex === 0 && p.stocks > 0);
+                const p2 = players.find(p => p.pIndex === 1 && p.stocks > 0);
+                const p3 = players.find(p => p.pIndex === 2 && p.stocks > 0);
+
+                switch(e.code) {
+                    case 'KeyA': keys.p1.left = true; break;
+                    case 'KeyD': keys.p1.right = true; break;
+                    case 'KeyW': keys.p1.up = true; if(p1) p1.tryJump(); break;
+                    case 'KeyS': keys.p1.down = true; break;
+                    case 'KeyF': if(!keys.p1.attack && p1) p1.attack(getAttackType('neutral', keys.p1)); keys.p1.attack = true; break;
+                    case 'KeyG': if(!keys.p1.special && p1) p1.attack(getAttackType('special', keys.p1)); keys.p1.special = true; break;
+                    
+                    case 'ArrowLeft': keys.p2.left = true; break;
+                    case 'ArrowRight': keys.p2.right = true; break;
+                    case 'ArrowUp': keys.p2.up = true; if(p2) p2.tryJump(); break;
+                    case 'ArrowDown': keys.p2.down = true; break;
+                    case 'KeyK': if(!keys.p2.attack && p2) p2.attack(getAttackType('neutral', keys.p2)); keys.p2.attack = true; break;
+                    case 'KeyL': if(!keys.p2.special && p2) p2.attack(getAttackType('special', keys.p2)); keys.p2.special = true; break;
+
+                    // Fallback Keyboard controls for Player 3 (Numpad)
+                    case 'Numpad4': keys.p3.left = true; break;
+                    case 'Numpad6': keys.p3.right = true; break;
+                    case 'Numpad8': keys.p3.up = true; if(p3) p3.tryJump(); break;
+                    case 'Numpad5': keys.p3.down = true; break;
+                    case 'Numpad1': if(!keys.p3.attack && p3) p3.attack(getAttackType('neutral', keys.p3)); keys.p3.attack = true; break;
+                    case 'Numpad2': if(!keys.p3.special && p3) p3.attack(getAttackType('special', keys.p3)); keys.p3.special = true; break;
+                }
+            });
+
+            window.addEventListener('keyup', (e) => {
+                switch(e.code) {
+                    case 'KeyA': keys.p1.left = false; break;
+                    case 'KeyD': keys.p1.right = false; break;
+                    case 'KeyW': keys.p1.up = false; break;
+                    case 'KeyS': keys.p1.down = false; break;
+                    case 'KeyF': keys.p1.attack = false; break;
+                    case 'KeyG': keys.p1.special = false; break;
+                    
+                    case 'ArrowLeft': keys.p2.left = false; break;
+                    case 'ArrowRight': keys.p2.right = false; break;
+                    case 'ArrowUp': keys.p2.up = false; break;
+                    case 'ArrowDown': keys.p2.down = false; break;
+                    case 'KeyK': keys.p2.attack = false; break;
+                    case 'KeyL': keys.p2.special = false; break;
+
+                    case 'Numpad4': keys.p3.left = false; break;
+                    case 'Numpad6': keys.p3.right = false; break;
+                    case 'Numpad8': keys.p3.up = false; break;
+                    case 'Numpad5': keys.p3.down = false; break;
+                    case 'Numpad1': keys.p3.attack = false; break;
+                    case 'Numpad2': keys.p3.special = false; break;
+                }
+            });
+        }
+
+        function updateMenuVisuals() {
+            if (activeScreen === 'character-select') {
+                const cards = document.querySelectorAll('.melee-char-card');
+                cards.forEach((c, idx) => {
+                    c.classList.remove('p1-hover-fx', 'p2-hover-fx', 'p3-hover-fx', 'p4-hover-fx');
+                    if (pTypes[0] !== -1 && idx === cursors[0] && !pSelections[0]) c.classList.add('p1-hover-fx');
+                    if (pTypes[1] !== -1 && idx === cursors[1] && !pSelections[1]) c.classList.add('p2-hover-fx');
+                    if (pTypes[2] !== -1 && idx === cursors[2] && !pSelections[2]) c.classList.add('p3-hover-fx');
+                    if (pTypes[3] !== -1 && idx === cursors[3] && !pSelections[3]) c.classList.add('p4-hover-fx');
+                });
+            } else if (activeScreen === 'stage-select') {
+                const cards = document.querySelectorAll('.stage-card');
+                cards.forEach((c, idx) => {
+                    c.classList.remove('stage-hover-fx');
+                    if (idx === stageCursor) c.classList.add('stage-hover-fx');
+                });
+            }
+        }
+
+        // Centralized Menu Navigation for both Keyboard and Gamepads
+        function moveMenuCursor(pIndex, direction) {
+            const charKeys = Object.keys(CHARACTERS);
+            const stageKeys = Object.keys(STAGES);
+            
+            if (activeScreen === 'character-select') {
+                let current = cursors[pIndex];
+                let max = charKeys.length;
+                if (direction === 'left') current = (current - 1 + max) % max;
+                if (direction === 'right') current = (current + 1) % max;
+                
+                if (pTypes[pIndex] !== -1 && !pSelections[pIndex]) cursors[pIndex] = current;
+            } else if (activeScreen === 'stage-select' && pIndex === 0) {
+                let max = stageKeys.length;
+                if (direction === 'left') stageCursor = (stageCursor - 1 + max) % max;
+                if (direction === 'right') stageCursor = (stageCursor + 1) % max;
+            }
+        }
+
+        function selectMenuAction(pIndex) {
+            if (activeScreen === 'title-screen') {
+                if (pIndex === 0) goToScreen('character-select');
+            } else if (activeScreen === 'character-select') {
+                let allReady = true;
+                let activeCount = 0;
+                for(let i=0; i<4; i++) {
+                    if(pTypes[i] !== -1) { activeCount++; if(!pSelections[i]) allReady = false; }
+                }
+
+                if (allReady && activeCount >= 2 && pIndex === 0) {
+                    goToScreen('stage-select');
+                } else {
+                    const cards = document.querySelectorAll('.melee-char-card');
+                    if (pTypes[pIndex] !== -1 && !pSelections[pIndex]) handleCharSelect(Object.keys(CHARACTERS)[cursors[pIndex]], cards[cursors[pIndex]]);
+                }
+            } else if (activeScreen === 'stage-select' && pIndex === 0) {
+                selectStage(Object.keys(STAGES)[stageCursor]);
+            } else if (activeScreen === 'result-screen' && pIndex === 0) {
+                resetGame();
+            }
+        }
+
+        function handleMenuGamepad(gp, pIndex) {
+            const threshold = 0.5;
+            const gpAttack = (gp.buttons[0] && gp.buttons[0].pressed) || (gp.buttons[9] && gp.buttons[9].pressed); // A or Start
+            const gpSpecial = (gp.buttons[1] && gp.buttons[1].pressed) || (gp.buttons[2] && gp.buttons[2].pressed) || (gp.buttons[3] && gp.buttons[3].pressed); // B, X, Y
+            
+            const left = gp.axes[0] < -threshold || (gp.buttons[14] && gp.buttons[14].pressed);
+            const right = gp.axes[0] > threshold || (gp.buttons[15] && gp.buttons[15].pressed);
+            
+            if (menuDelay[pIndex] > 0) menuDelay[pIndex]--;
+
+            if (menuDelay[pIndex] <= 0) {
+                let moved = false;
+                if (left) { moveMenuCursor(pIndex, 'left'); moved = true; }
+                if (right) { moveMenuCursor(pIndex, 'right'); moved = true; }
+                if (moved) menuDelay[pIndex] = 12; // Cooldown for UI movement
+            }
+
+            if (gpAttack && !prevPadState[pIndex].attack) selectMenuAction(pIndex);
+            if (gpSpecial && !prevPadState[pIndex].special) cycleSkin(pIndex + 1);
+
+            prevPadState[pIndex].attack = gpAttack;
+            prevPadState[pIndex].special = gpSpecial;
+            prevPadState[pIndex].jump = false;
+        }
+
+        function updateGamepads() {
+            const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+            if (!gamepads) return;
+
+            // Collect all active/connected controllers
+            let activePads = [];
+            for(let i = 0; i < gamepads.length; i++) {
+                if(gamepads[i]) activePads.push(gamepads[i]);
+            }
+
+            if (gameState === 'playing') {
+                if (activePads[0] && players[0] && pTypes[0] === 0) handleGamepad(activePads[0], padKeys.p1, players[0], keys.p1, 0);
+                if (activePads[1] && players[1] && pTypes[1] === 0) handleGamepad(activePads[1], padKeys.p2, players[1], keys.p2, 1);
+            } else {
+                // Poll UI menus if not in a game
+                if (activePads[0]) handleMenuGamepad(activePads[0], 0);
+                if (activePads[1]) handleMenuGamepad(activePads[1], 1);
+            }
+        }
+
+        function handleGamepad(gp, padState, player, keyState, pIndex) {
+            const threshold = 0.4;
+            
+            // Left Stick and D-Pad movement
+            padState.left = gp.axes[0] < -threshold || (gp.buttons[14] && gp.buttons[14].pressed);
+            padState.right = gp.axes[0] > threshold || (gp.buttons[15] && gp.buttons[15].pressed);
+            padState.up = gp.axes[1] < -threshold || (gp.buttons[12] && gp.buttons[12].pressed);
+            padState.down = gp.axes[1] > threshold || (gp.buttons[13] && gp.buttons[13].pressed);
+
+            // Button mapping simulates standard Smash Bros layout (Switch Pro / Joy-Cons)
+            // Bottom button = Attack, Right/Left button = Special, Top button = Jump
+            const gpAttack = (gp.buttons[0] && gp.buttons[0].pressed); 
+            const gpSpecial = (gp.buttons[1] && gp.buttons[1].pressed) || (gp.buttons[2] && gp.buttons[2].pressed); 
+            const gpJump = (gp.buttons[3] && gp.buttons[3].pressed) || padState.up; 
+
+            // Combine keyboard and gamepad directions for directional attacks
+            const combinedKeys = {
+                left: keyState.left || padState.left,
+                right: keyState.right || padState.right,
+                up: keyState.up || padState.up,
+                down: keyState.down || padState.down
+            };
+
+            if (gpAttack && !prevPadState[pIndex].attack) player.attack(getAttackType('neutral', combinedKeys));
+            if (gpSpecial && !prevPadState[pIndex].special) player.attack(getAttackType('special', combinedKeys));
+            if (gpJump && !prevPadState[pIndex].jump) player.tryJump();
+
+            // Save state to prevent button-holding spam
+            prevPadState[pIndex].jump = gpJump;
+            prevPadState[pIndex].attack = gpAttack;
+            prevPadState[pIndex].special = gpSpecial;
+        }
+
+        // ==========================================
+        // GAME CLASSES
+        // ==========================================
+
+        class Player {
+            constructor(id, data, x, y, pIndex, skinIndex) {
+                this.id = id;
+                this.data = data;
+                this.pIndex = pIndex;
+                this.skinIndex = skinIndex;
+                this.skinColor = data.skins[skinIndex];
+                this.width = 2;
+                this.height = 3.5;
+                this.depth = 2;
+
+                this.pos = new THREE.Vector3(x, y, 0);
+                this.vel = new THREE.Vector3(0, 0, 0);
+                this.grounded = false;
+                this.facing = pIndex === 0 ? 1 : -1;
+                this.jumpsLeft = 2;
+                
+                this.percent = 0;
+                this.stocks = 3;
+                this.hitstun = 0;
+                this.invuln = 0;
+                this.state = 'idle';
+                this.actionFrame = 0;
+                this.currentMove = null;
+                
+                // Animation properties
+                this.baseRotationY = 0;
+                this.isLoadedModel = false; 
+                this.loadedModel = null;
+                this.animationModels = {}; 
+                this.mixers = {}; // AnimationMixers for Mixamo data
+
+                const geo = new THREE.BoxGeometry(this.width, this.height, this.depth);
+                const mat = new THREE.MeshStandardMaterial({ color: this.skinColor, roughness: 0.4, metalness: 0.1, emissive: this.skinColor, emissiveIntensity: 0.1 });
+                
+                this.mesh = new THREE.Group();
+                
+                this.bodyMesh = new THREE.Mesh(geo, mat);
+                this.bodyMesh.castShadow = true;
+                this.bodyMesh.receiveShadow = true;
+                
+                const outlineMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.BackSide });
+                const outlineMesh = new THREE.Mesh(geo, outlineMat);
+                outlineMesh.scale.multiplyScalar(1.05);
+                this.bodyMesh.add(outlineMesh);
+                
+                this.mesh.add(this.bodyMesh);
+                
+                const eyeGeo = new THREE.BoxGeometry(0.5, 0.5, 0.6);
+                const eyeMat = new THREE.MeshBasicMaterial({color: 0xffffff});
+                this.eye = new THREE.Mesh(eyeGeo, eyeMat);
+                this.eye.position.set(0.5, 1, 1);
+                this.bodyMesh.add(this.eye);
+
+                const gltfLoader = new THREE.GLTFLoader();
+                const fbxLoader = new THREE.FBXLoader();
+                const textureLoader = new THREE.TextureLoader();
+
+                // NEW: Stand Mechanic Pre-Loader!
+                if (data.standData) {
+                    fbxLoader.load(data.standData.modelUrl, (loadedObj) => {
+                        this.standMesh = loadedObj;
+                        let sScale = data.standData.scale || 1;
+                        this.standMesh.scale.set(sScale, sScale, sScale);
+
+                        // Apply the standalone texture specifically to the Stand mesh
+                        const spTex = textureLoader.load(data.standData.textureUrl);
+                        spTex.flipY = true;
+                        
+                        this.standMesh.traverse((node) => {
+                            if (node.isMesh) {
+                                node.castShadow = true;
+                                if(node.material) {
+                                    if(Array.isArray(node.material)) node.material.forEach(m => { m.map = spTex; m.needsUpdate = true; });
+                                    else { node.material.map = spTex; node.material.needsUpdate = true; }
+                                }
+                            }
+                        });
+
+                        // Set up Stand Animation Mixer (Punching!)
+                        this.standMixer = new THREE.AnimationMixer(this.standMesh);
+                        if(loadedObj.animations && loadedObj.animations.length > 0) {
+                            this.standAction = this.standMixer.clipAction(loadedObj.animations[0]);
+                            this.standAction.play();
+                        }
+                        
+                        this.standMesh.visible = false;
+                        this.mesh.add(this.standMesh); // Attach Stand directly to the Player's Group!
+                    });
+                }
+
+                // Pre-load specific static textures if any exist
+                const loadedStaticTextures = {};
+                if (data.staticTextures) {
+                    for (const [matName, texUrl] of Object.entries(data.staticTextures)) {
+                        loadedStaticTextures[matName] = textureLoader.load(texUrl);
+                    }
+                }
+                
+                // Pre-load specific skin-dependent textures
+                if (data.multiSkinTextures) {
+                    for (const [matName, urls] of Object.entries(data.multiSkinTextures)) {
+                        if (urls[this.skinIndex]) {
+                            loadedStaticTextures[matName] = textureLoader.load(urls[this.skinIndex]);
+                        }
+                    }
+                }
+
+                let modelsToLoad = [];
+                if (data.modelUrls) {
+                    for (const [stateName, url] of Object.entries(data.modelUrls)) {
+                        modelsToLoad.push({ state: stateName, url: url });
+                    }
+                } else if (data.skinModels && data.skinModels[this.skinIndex]) {
+                    // NEW ENGINE FEATURE: Load a completely different file based on the selected skin!
+                    modelsToLoad.push({ state: 'single', url: data.skinModels[this.skinIndex] });
+                } else if (data.modelUrl) {
+                    modelsToLoad.push({ state: 'single', url: data.modelUrl });
+                }
+
+                modelsToLoad.forEach((item) => {
+                    if(!item.url || item.url.includes('LINK_TO_')) return; 
+                    
+                    const isFBX = item.url.toLowerCase().endsWith('.fbx');
+                    const loader = isFBX ? fbxLoader : gltfLoader;
+                    
+                    loader.load(item.url, (loadedObj) => {
+                        const model = isFBX ? loadedObj : loadedObj.scene;
+                        
+                        // Apply the configurable scale (and check for specific animation overrides!)
+                        let scale = data.modelScale || 1;
+                        if (data.customModelScales && data.customModelScales[item.state]) {
+                            scale = data.customModelScales[item.state];
+                        }
+                        model.scale.set(scale, scale, scale); 
+                        
+                        model.position.y = -this.height / 2;
+                        model.rotation.y = (Math.PI / 2) * this.facing;
+                        
+                        const originalMeshes = [];
+                        model.traverse((node) => {
+                            if (node.isMesh) originalMeshes.push(node);
+                        });
+                        
+                        let customTexture = null;
+                        if (data.skinUrls && data.skinUrls[this.skinIndex]) {
+                            customTexture = textureLoader.load(data.skinUrls[this.skinIndex]);
+                            // Fix: FBX needs flipY = true, GLTF needs false.
+                            customTexture.flipY = isFBX; 
+                            customTexture.wrapS = THREE.RepeatWrapping;
+                            customTexture.wrapT = THREE.RepeatWrapping;
+                        }
+                        
+                        originalMeshes.forEach((node) => {
+                            node.castShadow = true;
+                            node.receiveShadow = true;
+                            
+                            // Process Material Array or Single Material
+                            const processMaterial = (mat) => {
+                                // 1. Map specific image files to their target materials (poo.png, etc)
+                                if (data.staticTextures && loadedStaticTextures[mat.name]) {
+                                    mat.map = loadedStaticTextures[mat.name];
+                                    mat.map.flipY = isFBX; // Fixes mapping on FBX sub-materials
+                                    mat.map.wrapS = THREE.RepeatWrapping;
+                                    mat.map.wrapT = THREE.RepeatWrapping;
+                                    mat.color.setHex(0xffffff); 
+                                    mat.needsUpdate = true;
+                                }
+                                
+                                // 2. Map Skin colors to target clothing/body materials
+                                let shouldTint = true;
+                                if (data.skinMaterials && mat.name) {
+                                    shouldTint = data.skinMaterials.includes(mat.name);
+                                } else if (data.skinMaterials && !mat.name) {
+                                    shouldTint = false;
+                                }
+
+                                if (shouldTint) {
+                                    if (customTexture) {
+                                        mat.map = customTexture;
+                                        mat.color.setHex(0xffffff); 
+                                    } else if (this.skinIndex > 0) {
+                                        mat.color.setHex(this.skinColor); 
+                                    }
+                                }
+                            };
+
+                            if (node.material) {
+                                if (Array.isArray(node.material)) {
+                                    node.material = node.material.map(m => m.clone());
+                                    node.material.forEach(m => processMaterial(m));
+                                } else {
+                                    node.material = node.material.clone();
+                                    processMaterial(node.material);
+                                }
+                            }
+                            
+                            // Apply Cartoon Outline
+                            const modelOutlineMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.BackSide });
+                            const modelOutlineMesh = new THREE.Mesh(node.geometry, modelOutlineMat);
+                            // Avoid skinning the skeleton for the outline mesh (prevents mixamo bone errors)
+                            modelOutlineMesh.scale.multiplyScalar(1.05);
+                            
+                            // Only add outlines to static meshes (Rigged/Skinned FBX outlines require special handling, skipping outline on rigged meshes for stability)
+                            if (!node.isSkinnedMesh) {
+                                node.add(modelOutlineMesh);
+                            }
+                        });
+                        
+                        // Setup Mixamo Animation Mixer if movement data exists
+                        const anims = isFBX ? loadedObj.animations : loadedObj.animations;
+                        if (anims && anims.length > 0) {
+                            const mixer = new THREE.AnimationMixer(model);
+                            const action = mixer.clipAction(anims[0]);
+                            action.play();
+                            this.mixers[item.state] = mixer;
+                        }
+
+                        if (item.state === 'single') {
+                            this.loadedModel = model;
+                            this.mesh.add(model);
+                        } else {
+                            model.visible = false;
+                            this.animationModels[item.state] = model;
+                            this.mesh.add(model);
+                        }
+                        
+                        this.mesh.remove(this.bodyMesh); 
+                        this.isLoadedModel = true; 
+                    });
+                });
+
+                this.mesh.position.copy(this.pos);
+                scene.add(this.mesh);
+            }
+
+            tryJump() {
+                if (this.hitstun > 0 || this.state === 'attack') return;
+                if (this.grounded || this.jumpsLeft > 0) {
+                    this.vel.y = this.data.jump;
+                    this.grounded = false;
+                    this.jumpsLeft--;
+                }
+            }
+
+            attack(type) {
+                if (this.hitstun > 0 || this.state === 'attack') return;
+                
+                // Retrieve the specific directional move
+                let move = this.data.moves[type];
+                
+                // Fallback system: if player pressed up+attack but character lacks up_attack, do normal attack
+                if (!move) {
+                    if (type.includes('special')) move = this.data.moves['special'];
+                    else move = this.data.moves['neutral'];
+                }
+                if (!move) return;
+
+                this.state = 'attack';
+                this.currentMove = move;
+                this.actionFrame = (move.duration || 10) + (move.startup || 0);
+            }
+
+            takeDamage(dmg, kb, kbAngleX, kbAngleY, attackerFacing) {
+                if (this.invuln > 0 || this.stocks <= 0) return;
+                this.percent += dmg;
+                const kbScale = ((((this.percent / 10) + (this.percent * dmg / 20)) * this.data.weight) + 18) * 0.01;
+                const totalKb = (kb * kbScale);
+
+                this.vel.x = totalKb * kbAngleX * attackerFacing;
+                this.vel.y = totalKb * kbAngleY;
+
+                this.hitstun = Math.floor(totalKb * 15);
+                this.state = 'hit';
+                this.actionFrame = 0;
+                
+                createHitEffect(this.pos.x, this.pos.y, totalKb);
+            }
+
+            die() {
+                this.stocks--;
+                this.percent = 0;
+                if (this.stocks <= 0) {
+                    this.mesh.visible = false;
+                    this.pos.set(0, -1000, 0); // Hide dead players completely
+                    this.vel.set(0, 0, 0);
+                    checkWinCondition();
+                    return;
+                }
+                const startX = [-15, 15, -5, 5];
+                this.pos.set(startX[this.pIndex], 20, 0);
+                this.vel.set(0, 0, 0);
+                this.invuln = 120;
+                this.hitstun = 0;
+                this.state = 'idle';
+                if(this.loadedModel) this.loadedModel.rotation.set(0,0,0);
+            }
+
+            update(input) {
+                if (this.invuln > 0) {
+                    this.invuln--;
+                    this.bodyMesh.material.opacity = (this.invuln % 10 < 5) ? 0.3 : 1.0;
+                    this.bodyMesh.material.transparent = true;
+                } else {
+                    this.bodyMesh.material.opacity = 1.0;
+                    this.bodyMesh.material.transparent = false;
+                }
+
+                if (this.hitstun > 0) {
+                    this.hitstun--;
+                    if (this.hitstun <= 0) this.state = 'fall';
+                }
+
+                if (this.state === 'attack') {
+                    this.actionFrame--;
+                    if (this.actionFrame === (this.currentMove && this.currentMove.duration || 10) && this.currentMove) {
+                        this.executeMove(this.currentMove);
+                    }
+                    if (this.actionFrame <= 0) {
+                        this.state = this.grounded ? 'idle' : 'fall';
+                        this.currentMove = null;
+                        this.mesh.rotation.y = this.baseRotationY; // Reset spin
+                    }
+                }
+
+                if (!this.grounded) this.vel.y -= 0.015;
+
+                if (this.hitstun <= 0 && this.state !== 'attack') {
+                    if (input.left) {
+                        this.vel.x = -this.data.speed;
+                        this.facing = -1;
+                        this.state = 'run';
+                        this.baseRotationY = THREE.MathUtils.lerp(this.baseRotationY, -0.4, 0.2);
+                    } else if (input.right) {
+                        this.vel.x = this.data.speed;
+                        this.facing = 1;
+                        this.state = 'run';
+                        this.baseRotationY = THREE.MathUtils.lerp(this.baseRotationY, 0.4, 0.2);
+                    } else {
+                        this.vel.x *= (this.grounded ? 0.7 : 0.9);
+                        if (Math.abs(this.vel.x) < 0.01) this.vel.x = 0;
+                        if(this.grounded) this.state = 'idle';
+                        this.baseRotationY = THREE.MathUtils.lerp(this.baseRotationY, 0, 0.2);
+                    }
+                    if (input.down && !this.grounded && this.vel.y < 0) this.vel.y -= 0.02;
+                }
+                
+                // Dash physics override
+                if (this.state === 'attack' && this.currentMove && this.currentMove.type.includes('dash') && this.actionFrame < (this.currentMove.duration || 10)) {
+                    if (this.currentMove.type === 'recovery_dash') {
+                        this.vel.x = this.currentMove.vx * this.facing;
+                        this.vel.y = this.currentMove.vy;
+                    } else {
+                        this.vel.x = this.currentMove.speed * this.facing;
+                        this.vel.y = 0; 
+                    }
+                    if (this.actionFrame % 3 === 0) this.executeMove(this.currentMove); 
+                }
+
+                this.pos.add(this.vel);
+                
+                // Collision Logic
+                this.grounded = false;
+                const stage = STAGES[currentStageId];
+                
+                if (this.vel.y <= 0) {
+                    for (const plat of stage.platforms) {
+                        if (plat.type === 'pass-through' && input.down) continue;
+                        const pLeft = plat.x - plat.w/2, pRight = plat.x + plat.w/2, pTop = plat.y + (plat.h||2)/2; 
+                        
+                        if (this.pos.x + this.width/2 > pLeft && this.pos.x - this.width/2 < pRight) {
+                            const feetY = this.pos.y - this.height/2;
+                            const prevFeetY = feetY - this.vel.y;
+                            if (feetY <= pTop && prevFeetY >= pTop - 0.5) {
+                                this.pos.y = pTop + this.height/2;
+                                this.vel.y = 0;
+                                this.grounded = true;
+                                this.jumpsLeft = 2;
+                            }
+                        }
+                    }
+                }
+
+                if (this.pos.y < stage.bounds.bottom || this.pos.x < -stage.bounds.x || this.pos.x > stage.bounds.x || this.pos.y > stage.bounds.y) {
+                    this.die();
+                }
+
+                // =====================================
+                // PROCEDURAL & MULTI-MODEL ANIMATION
+                // =====================================
+                this.mesh.position.copy(this.pos);
+                this.mesh.scale.set(1, 1, 1); 
+                this.eye.position.set(0.5 * this.facing, 1, 1);
+                
+                // Swap Multi-Models based on state
+                let activeStateKey = this.state;
+
+                // Airborne override for animation purposes
+                if (!this.grounded && this.state !== 'attack' && this.state !== 'hit') {
+                    if (this.vel.y > 0) activeStateKey = 'jump';
+                    else activeStateKey = 'fall';
+                }
+
+                // Special Move override 
+                if (this.state === 'attack' && this.currentMove && (this.currentMove === this.data.moves['special'] || this.currentMove === this.data.moves['up_special'] || this.currentMove === this.data.moves['down_special'])) {
+                    if (this.animationModels['special']) {
+                        activeStateKey = 'special';
+                    }
+                }
+
+                if (Object.keys(this.animationModels).length > 0) {
+                    for (const key in this.animationModels) this.animationModels[key].visible = false;
+                    
+                    let activeModel = this.animationModels[activeStateKey];
+                    if (!activeModel && activeStateKey === 'special') { activeModel = this.animationModels['attack']; activeStateKey = 'attack'; }
+                    if (!activeModel && activeStateKey === 'fall') { activeModel = this.animationModels['jump']; activeStateKey = 'jump'; }
+                    if (!activeModel && activeStateKey === 'jump') { activeModel = this.animationModels['idle']; activeStateKey = 'idle'; }
+                    if (!activeModel && activeStateKey === 'run') { activeModel = this.animationModels['idle']; activeStateKey = 'idle'; }
+                    if (!activeModel && activeStateKey === 'hit') { activeModel = this.animationModels['fall']; activeStateKey = 'fall'; }
+                    if (!activeModel) { activeModel = this.animationModels['idle']; activeStateKey = 'idle'; } 
+                    
+                    if (activeModel) {
+                        activeModel.visible = true;
+                        this.loadedModel = activeModel; 
+                    }
+                }
+
+                // Smoothly turn the active 3D model to face the moving direction
+                if (this.loadedModel && !this.loadedModel.isSkinnedMesh) {
+                    let targetRotation = (Math.PI / 2) * this.facing;
+                    
+                    // Apply any specific rotation fixes for wonky Mixamo exports
+                    if (this.data.modelRotationOffsets && this.data.modelRotationOffsets[activeStateKey]) {
+                        targetRotation += this.data.modelRotationOffsets[activeStateKey];
+                    }
+                    
+                    this.loadedModel.rotation.y = THREE.MathUtils.lerp(this.loadedModel.rotation.y, targetRotation, 0.3);
+                }
+                
+                // Play internal FBX/Mixamo animations
+                if (this.mixers[activeStateKey]) {
+                    this.mixers[activeStateKey].update(1/60); // Update the animation at 60 FPS
+                }
+
+                // =====================================
+                // STAND MECHANIC LOGIC
+                // =====================================
+                if (this.standMesh) {
+                    if (this.state === 'attack') {
+                        this.standMesh.visible = true;
+                        this.standMixer.update(1/60);
+                        
+                        // Spawn the stand in front of the player perfectly aligned with the hitbox
+                        const standOffsetX = this.data.standData.offsetX || 1.5;
+                        const standOffsetY = this.data.standData.offsetY || 0;
+                        this.standMesh.position.set(standOffsetX * this.facing, standOffsetY, 0);
+                        
+                        // Ensure the stand faces the correct direction
+                        this.standMesh.rotation.y = (Math.PI / 2) * this.facing;
+                        if(this.data.standData.rotationOffset) {
+                            this.standMesh.rotation.y += this.data.standData.rotationOffset;
+                        }
+                    } else {
+                        // Hide and reset stand animation when not attacking
+                        this.standMesh.visible = false;
+                        if(this.standAction) {
+                            this.standAction.reset();
+                            this.standAction.play();
+                        }
+                    }
+                }
+                
+                const stretchLimit = this.isLoadedModel ? 0.03 : 0.4;
+                const leanAmount = this.isLoadedModel ? 0.4 : 1.0;
+                const hopHeight = this.isLoadedModel ? 0.15 : 0.4;
+                
+                if (this.hitstun > 0) {
+                    // Tumbling when hit
+                    this.mesh.rotation.z += 0.3 * this.facing;
+                    this.mesh.rotation.y = this.baseRotationY;
+                } else if (this.state === 'attack') {
+                    // Upgraded Attack Animations
+                    const totalFrames = (this.currentMove && this.currentMove.duration ? this.currentMove.duration : 10) + (this.currentMove && this.currentMove.startup ? this.currentMove.startup : 0);
+                    const progress = totalFrames > 0 ? 1 - (this.actionFrame / totalFrames) : 1;
+
+                    if (this.currentMove && this.currentMove.type.includes('dash')) {
+                        this.mesh.rotation.z = -1.0 * leanAmount * this.facing; // Fly pose
+                    } else if (this.currentMove && this.currentMove.type === 'projectile') {
+                        // Spitting / Shooting Animation (Recoil back, then snap forward)
+                        if (progress < 0.4) {
+                            this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, 0.4 * leanAmount * this.facing, 0.3); // Lean back
+                            if (!this.isLoadedModel) this.mesh.scale.set(1.2, 0.8, 1.2); // Only squash placeholders
+                        } else if (progress < 0.7) {
+                            this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, -0.6 * leanAmount * this.facing, 0.6); // Snap forward
+                            if (!this.isLoadedModel) this.mesh.scale.set(0.8, 1.3, 0.8); // Only stretch placeholders
+                        } else {
+                            this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, 0, 0.2); // Recover
+                        }
+                    } else {
+                        // Melee Strike (Wind up and punch)
+                        if (progress < 0.3) {
+                            this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, 0.3 * leanAmount * this.facing, 0.4); // Pull back
+                        } else if (progress < 0.6) {
+                            this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, -0.5 * leanAmount * this.facing, 0.6); // Strike forward
+                        } else {
+                            this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, 0, 0.2); // Recover
+                        }
+                    }
+                    this.mesh.rotation.y = this.baseRotationY;
+                } else if (!this.grounded) {
+                    // Squash and Stretch based on vertical velocity
+                    const stretch = Math.min(Math.abs(this.vel.y) * 1.5, stretchLimit);
+                    this.mesh.scale.set(1 - stretch, 1 + stretch, 1 - stretch);
+                    this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, 0, 0.2);
+                    this.mesh.rotation.y = this.baseRotationY;
+                } else if (this.state === 'run') {
+                    // Run Lean + Hop
+                    this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, -0.2 * leanAmount * this.facing, 0.3); // Subtle lean
+                    this.mesh.position.y += Math.abs(Math.sin(globalTime * 0.4)) * hopHeight; // Gentle hop
+                    this.mesh.rotation.y = this.baseRotationY;
+                } else {
+                    // Idle Breathing
+                    this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, 0, 0.2);
+                    this.mesh.scale.set(1, 1 + Math.sin(globalTime * 0.1) * (this.isLoadedModel ? 0.02 : 0.05), 1); // Subtle breathing
+                    this.mesh.rotation.y = this.baseRotationY;
+                }
+            }
+
+            executeMove(move) {
+                if (move.type === 'melee' || move.type.includes('dash')) {
+                    hitboxes.push(new Hitbox(this.pos.x + ((move.ox||0) * this.facing), this.pos.y + (move.oy||0), move.w||3, move.h||3, move.dmg, move.kb, this.pIndex, this.facing));
+                } else if (move.type === 'projectile') {
+                    // Projectiles now support angled shots based on their properties
+                    const vx = move.vx !== undefined ? move.vx * this.facing : (move.speed || 0.4) * this.facing;
+                    const vy = move.vy || 0;
+                    projectiles.push(new Projectile(this.pos.x + (1.5 * this.facing), this.pos.y + 0.5, vx, vy, move, this.pIndex));
+                }
+            }
+
+            getBounds() {
+                return { left: this.pos.x - this.width/2, right: this.pos.x + this.width/2, bottom: this.pos.y - this.height/2, top: this.pos.y + this.height/2 };
+            }
+        }
+
+        class Hitbox {
+            constructor(x, y, w, h, dmg, kb, ownerId, facing) {
+                this.x = x; this.y = y; this.w = w; this.h = h; this.dmg = dmg; this.kb = kb; this.ownerId = ownerId; this.facing = facing; this.life = 2; 
+                this.mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, 2), new THREE.MeshBasicMaterial({color: 0xff0000, transparent: true, opacity: 0.2}));
+                this.mesh.position.set(x, y, 0);
+                scene.add(this.mesh);
+            }
+            update() {
+                this.life--;
+                if (this.life <= 0) scene.remove(this.mesh);
+            }
+        }
+
+        class Projectile {
+            constructor(x, y, vx, vy, data, ownerId) {
+                this.pos = new THREE.Vector3(x, y, 0); this.vel = new THREE.Vector3(vx, vy, 0); this.data = data; this.ownerId = ownerId; this.life = data.life || 60;
+                this.mesh = new THREE.Mesh(new THREE.SphereGeometry(data.w), new THREE.MeshStandardMaterial({color: data.color, emissive: data.color, emissiveIntensity: 0.8}));
+                this.mesh.position.copy(this.pos);
+                scene.add(this.mesh);
+            }
+            update() {
+                this.pos.add(this.vel);
+                this.mesh.position.copy(this.pos);
+                this.life--;
+                if(this.life % 2 === 0) hitboxes.push(new Hitbox(this.pos.x, this.pos.y, this.data.w*2, this.data.w*2, this.data.dmg, this.data.kb, this.ownerId, this.vel.x > 0 ? 1 : -1));
+                if (this.life <= 0) scene.remove(this.mesh);
+            }
+        }
+
+        function createHitEffect(x, y, intensity) {
+            const mesh = new THREE.Mesh(new THREE.RingGeometry(0.5, Math.max(1.5, intensity), 16), new THREE.MeshBasicMaterial({color: 0xffdd00, side: THREE.DoubleSide, transparent: true, opacity: 1}));
+            mesh.position.set(x, y, 1);
+            scene.add(mesh);
+            let frame = 0;
+            const animateEffect = () => {
+                frame++; mesh.scale.x += 0.3; mesh.scale.y += 0.3; mesh.material.opacity -= 0.1; mesh.rotation.z += 0.2;
+                if (frame < 10) requestAnimationFrame(animateEffect); else scene.remove(mesh);
+            }
+            animateEffect();
+        }
+
+        // ==========================================
+        // MAIN GAME LOGIC
+        // ==========================================
+
+        function createMeshFromShape(data) {
+            let geo;
+            if (data.shape === 'box') geo = new THREE.BoxGeometry(data.w||2, data.h||2, data.d||2);
+            else if (data.shape === 'cylinder') geo = new THREE.CylinderGeometry(data.radius||1, data.radius||1, data.h||2, 16);
+            else if (data.shape === 'sphere') geo = new THREE.SphereGeometry(data.radius||1, 16, 16);
+            else if (data.shape === 'tetrahedron') geo = new THREE.TetrahedronGeometry(data.size||2);
+            else if (data.shape === 'cone') geo = new THREE.ConeGeometry(data.radius||1, data.h||2, data.segments||16);
+            else if (data.shape === 'torus') geo = new THREE.TorusGeometry(data.radius||10, data.tube||2, 16, 64);
+            else geo = new THREE.BoxGeometry(2,2,2);
+
+            const matParams = { color: data.color, roughness: 0.7, metalness: 0.2 };
+            if (data.emissive) { matParams.emissive = data.emissive; matParams.emissiveIntensity = data.emissiveIntensity || 0.5; }
+            const mat = new THREE.MeshStandardMaterial(matParams);
+            
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(data.x||0, data.y||0, data.z||0);
+            if (data.rx) mesh.rotation.x = data.rx;
+            if (data.ry) mesh.rotation.y = data.ry;
+            if (data.rz) mesh.rotation.z = data.rz;
+            
+            mesh.castShadow = true; mesh.receiveShadow = true;
+            if(data.animated) mesh.userData.animated = data.animated;
+            if(data.shape === 'box' && data.emissive) mesh.userData.originalEmissive = data.emissiveIntensity;
+
+            return mesh;
+        }
+
+        function startGame() {
+            const stage = STAGES[currentStageId];
+            scene.background = new THREE.Color(stage.bgColor);
+            scene.fog = new THREE.FogExp2(stage.bgColor, 0.015);
+
+            stage.platforms.forEach(plat => { const mesh = createMeshFromShape(plat); scene.add(mesh); stageMeshes.push(mesh); });
+            if (stage.decorations) { stage.decorations.forEach(dec => { const mesh = createMeshFromShape(dec); scene.add(mesh); decorationMeshes.push(mesh); }); }
+
+            const startX = [-15, 15, -5, 5];
+            for (let i = 0; i < 4; i++) {
+                if (pTypes[i] !== -1 && pSelections[i]) {
+                    players.push(new Player(pSelections[i], CHARACTERS[pSelections[i]], startX[i], 10, i, pSkins[i]));
+                    document.getElementById(`hud-panel-${i}`).classList.remove('hidden');
+                    document.getElementById(`hud-name-p${i+1}`).innerText = CHARACTERS[pSelections[i]].name;
+                } else {
+                    document.getElementById(`hud-panel-${i}`).classList.add('hidden');
+                }
+            }
+            
+            document.getElementById('hud').classList.remove('hidden');
+            document.getElementById('match-timer').innerText = "GO!";
+            setTimeout(() => { document.getElementById('match-timer').innerText = ""; }, 1500);
+
+            camera.position.set(0, 10, 50); camera.lookAt(0,0,0);
+            gameState = 'playing'; updateHUD();
+        }
+
+        function checkCollisions() {
+            for (let i = hitboxes.length - 1; i >= 0; i--) {
+                const hb = hitboxes[i]; let hitSomeone = false;
+                for (let p of players) {
+                    if (p.pIndex === hb.ownerId || p.stocks <= 0) continue; 
+                    const bounds = p.getBounds();
+                    if (hb.x+hb.w/2 > bounds.left && hb.x-hb.w/2 < bounds.right && hb.y+hb.h/2 > bounds.bottom && hb.y-hb.h/2 < bounds.top) {
+                        p.takeDamage(hb.dmg, hb.kb, 0.707, 0.707, hb.facing);
+                        hitSomeone = true;
+                        projectiles.forEach(proj => { if (proj.ownerId === hb.ownerId) proj.life = 0; });
+                    }
+                }
+                if (hitSomeone) hb.life = 0; 
+            }
+        }
+
+        function getCPUInput(cpu, level) {
+            const input = { left: false, right: false, up: false, down: false };
+            if (!cpu || cpu.hitstun > 0 || cpu.state === 'attack') return input;
+
+            // CPU Reaction Time / Hesitation filter based on level
+            if (Math.random() > (0.1 + (level * 0.1))) return input;
+
+            // Find closest active target
+            let target = null;
+            let minDist = Infinity;
+            for (let p of players) {
+                if (p.pIndex === cpu.pIndex || p.stocks <= 0) continue;
+                let dist = cpu.pos.distanceTo(p.pos);
+                if (dist < minDist) { minDist = dist; target = p; }
+            }
+            
+            if (!target) return input; // If nobody is left, just stand still
+
+            const dx = target.pos.x - cpu.pos.x;
+            const dy = target.pos.y - cpu.pos.y;
+            const dist = minDist;
+
+            const stage = STAGES[currentStageId];
+            const isOffStage = cpu.pos.x < -stage.bounds.x + 5 || cpu.pos.x > stage.bounds.x - 5 || cpu.pos.y < stage.bounds.bottom + 10;
+            
+            // CPU Recovery Logic
+            if (isOffStage || cpu.pos.y < -3) {
+                // High levels recover flawlessly. Low levels might just fall to their doom.
+                if (Math.random() < (level / 9)) {
+                    if (cpu.pos.x < 0) input.right = true;
+                    if (cpu.pos.x > 0) input.left = true;
+                    
+                    if (cpu.pos.y < target.pos.y && !cpu.grounded) {
+                        if (cpu.jumpsLeft > 0) {
+                            cpu.tryJump();
+                            input.up = true;
+                        } else if (cpu.vel.y < 0) {
+                            input.up = true;
+                            cpu.attack(getAttackType('special', input)); // Up Special to save itself
+                        }
+                    }
+                }
+                return input;
+            }
+
+            // CPU Attack logic
+            if (dist < 6) {
+                let didAttack = false;
+                let attackDir = { left: false, right: false, up: false, down: false };
+                
+                // Decide aim
+                if (dy > 3) attackDir.up = true;
+                else if (dy < -2) attackDir.down = true;
+                else if (dx > 0) attackDir.right = true;
+                else attackDir.left = true;
+
+                // Attack probabilities scale drastically with level
+                const attackProb = level * 0.015;
+                const specialProb = level * 0.005;
+
+                if (Math.random() < attackProb) {
+                    cpu.attack(getAttackType('neutral', attackDir));
+                    didAttack = true;
+                } else if (Math.random() < specialProb) {
+                    cpu.attack(getAttackType('special', attackDir));
+                    didAttack = true;
+                }
+
+                // If not attacking, try to move slightly closer (or space out if high level)
+                if (!didAttack) {
+                    if (level >= 7 && Math.random() < 0.2) {
+                        // High levels back away strategically
+                        if (dx > 0) input.left = true;
+                        if (dx < 0) input.right = true;
+                    } else {
+                        if (dx > 2) input.right = true;
+                        if (dx < -2) input.left = true;
+                    }
+                }
+            } else {
+                // CPU Movement approach logic
+                if (dx > 1) input.right = true;
+                if (dx < -1) input.left = true;
+                
+                // Jump approach to catch high targets
+                if (dy > 4 && Math.random() < (level * 0.02)) {
+                    input.up = true;
+                    cpu.tryJump();
+                }
+                
+                // Dash approach occasionally (mostly high levels)
+                if (level >= 5 && Math.random() < (level * 0.005)) {
+                    input.right = dx > 0;
+                    input.left = dx <= 0;
+                    cpu.attack(getAttackType('special', input));
+                }
+            }
+            return input;
+        }
+
+        function updateCamera() {
+            let active = players.filter(p => p.stocks > 0);
+            if (active.length === 0) return;
+            
+            let minX = active[0].pos.x, maxX = active[0].pos.x;
+            let minY = active[0].pos.y, maxY = active[0].pos.y;
+            
+            for(let p of active) {
+                minX = Math.min(minX, p.pos.x); maxX = Math.max(maxX, p.pos.x);
+                minY = Math.min(minY, p.pos.y); maxY = Math.max(maxY, p.pos.y);
+            }
+            
+            let centerX = (minX + maxX) / 2, centerY = (minY + maxY) / 2;
+            let dist = Math.max(maxX - minX, maxY - minY, 15);
+
+            camera.position.x += (centerX - camera.position.x) * 0.1;
+            camera.position.y += ((centerY + 5) - camera.position.y) * 0.1; 
+            let targetZ = Math.min(Math.max(dist * 1.0 + 25, 35), 90); 
+            camera.position.z += (targetZ - camera.position.z) * 0.05;
+            camera.lookAt(camera.position.x, camera.position.y - 5, 0);
+        }
+
+        function updateStageAnimations() {
+            decorationMeshes.forEach(mesh => {
+                if(!mesh.userData.animated) return;
+                const anim = mesh.userData.animated;
+                if (anim === 'spin-float') { mesh.rotation.y += 0.01; mesh.rotation.x += 0.005; mesh.position.y += Math.sin(globalTime * 0.05) * 0.02; } 
+                else if (anim === 'spin-float-offset') { mesh.rotation.y -= 0.015; mesh.rotation.z += 0.01; mesh.position.y += Math.cos(globalTime * 0.05) * 0.03; } 
+                else if (anim === 'float-slow') { mesh.position.x += 0.02; if(mesh.position.x > 50) mesh.position.x = -50; } 
+                else if (anim === 'float-slow-offset') { mesh.position.x -= 0.015; if(mesh.position.x < -50) mesh.position.x = 50; } 
+                else if (anim === 'lava-pulse') { mesh.material.emissiveIntensity = (mesh.userData.originalEmissive || 0.8) + Math.sin(globalTime * 0.1) * 0.3; }
+            });
+        }
+
+        function gameLoop() {
+            requestAnimationFrame(gameLoop);
+            globalTime++;
+
+            updateGamepads(); // Poll controllers globally now
+
+            if (gameState === 'menu' || gameState === 'result') {
+                bgStars.rotation.y += 0.001; bgStars.rotation.x += 0.0005;
+                camera.position.set(Math.sin(globalTime * 0.005) * 30, 15 + Math.sin(globalTime * 0.01) * 5, Math.cos(globalTime * 0.005) * 30 + 50);
+                camera.lookAt(0, 5, 0);
+                updateMenuVisuals();
+            } 
+            else if (gameState === 'playing') {
+                bgStars.rotation.y += 0.0002; 
+                updateStageAnimations();
+                
+                // Apply Inputs for ALL active players dynamically
+                players.forEach(p => {
+                    if (p.stocks <= 0) return;
+                    let input;
+                    if (pTypes[p.pIndex] > 0) {
+                        input = getCPUInput(p, pTypes[p.pIndex]); // CPU Input
+                    } else {
+                        // Human Input (Keyboard + Gamepad Merge)
+                        input = {
+                            left: keys[`p${p.pIndex+1}`].left || padKeys[`p${p.pIndex+1}`].left,
+                            right: keys[`p${p.pIndex+1}`].right || padKeys[`p${p.pIndex+1}`].right,
+                            up: keys[`p${p.pIndex+1}`].up || padKeys[`p${p.pIndex+1}`].up,
+                            down: keys[`p${p.pIndex+1}`].down || padKeys[`p${p.pIndex+1}`].down
+                        };
+                    }
+                    p.update(input);
+                });
+                
+                for (let i = projectiles.length - 1; i >= 0; i--) { projectiles[i].update(); if (projectiles[i].life <= 0) projectiles.splice(i, 1); }
+                checkCollisions();
+                for (let i = hitboxes.length - 1; i >= 0; i--) { hitboxes[i].update(); if (hitboxes[i].life <= 0) hitboxes.splice(i, 1); }
+                updateCamera(); updateHUD();
+            }
+            if (renderer && scene && camera) renderer.render(scene, camera);
+        }
+
+        window.onload = function() { 
+            initThree(); 
+            initUI(); 
+            gameLoop(); 
+        };
+    </script>
+</body>
+</html>
